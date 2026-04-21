@@ -42,24 +42,38 @@ required. Runs happily on a laptop.
 - `git`, `ffmpeg`, `cmake` on your `$PATH`
   (macOS: `brew install ffmpeg cmake`)
 
-### Quick install (recommended for end users)
+### Recommended: pipx (one line)
 
-One command. Installs `localcaption` system-wide via [pipx](https://pipx.pypa.io)
-and bootstraps `whisper.cpp` + a default model. After this you can run
-`localcaption <url>` from any directory.
+The most Pythonic install. [`pipx`](https://pipx.pypa.io) creates an isolated
+virtualenv for `localcaption` and drops the console script on your `$PATH`,
+so you can run `localcaption <url>` from anywhere without polluting your
+system Python.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jatinkrmalik/localcaption/main/scripts/install.sh | bash
+pipx install localcaption
 ```
 
-What it does:
+The first time you run `localcaption <url>` it will tell you it can't find
+`whisper.cpp`. To set it up (clone + build + download the default model),
+use **either** of:
 
-1. Verifies prerequisites (`python3`, `git`, `ffmpeg`, `cmake`) and installs `pipx` + `cmake` if missing (via `brew` or `apt`).
-2. `pipx install localcaption` — isolated venv, console script on `$PATH`.
-3. Clones & builds `whisper.cpp` into `~/.local/share/localcaption/whisper.cpp/` (XDG-compliant).
-4. Downloads the default `base.en` ggml model.
+```bash
+# Option A — let our installer do it (XDG-compliant, ~2 min on M-series Mac):
+curl -fsSL https://raw.githubusercontent.com/jatinkrmalik/localcaption/main/scripts/install.sh | bash
 
-Override the default model with `WHISPER_MODEL=small.en bash install.sh`.
+# Option B — DIY, anywhere you like:
+git clone https://github.com/ggerganov/whisper.cpp /path/to/whisper.cpp
+cd /path/to/whisper.cpp && cmake -B build && cmake --build build -j --config Release
+bash models/download-ggml-model.sh base.en
+export LOCALCAPTION_WHISPER_DIR=/path/to/whisper.cpp   # add to your shell rc
+```
+
+> 💡 **Already trust the install script?** Just run it directly — it'll do
+> `pipx install localcaption` for you, plus prereqs (`pipx`, `cmake` via
+> `brew`/`apt`) and the whisper.cpp bootstrap, all in one command:
+> `curl -fsSL https://raw.githubusercontent.com/jatinkrmalik/localcaption/main/scripts/install.sh | bash`
+>
+> Override the default model with `WHISPER_MODEL=small.en bash install.sh`.
 
 After install, verify everything is wired up:
 
