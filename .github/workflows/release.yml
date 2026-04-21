@@ -75,37 +75,11 @@ jobs:
           retention-days: 7
 
   # ─────────────────────────────────────────────────────────────────────
-  # 2. Dry-run publish to TestPyPI. Catches bad metadata, name clashes,
-  #    README render issues, etc. before they hit the real index.
-  # ─────────────────────────────────────────────────────────────────────
-  publish-testpypi:
-    name: Publish to TestPyPI (dry run)
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/project/localcaption/
-    permissions:
-      id-token: write   # required for Trusted Publishing (OIDC)
-    steps:
-      - name: Download dist artefacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
-      - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          skip-existing: true
-
-  # ─────────────────────────────────────────────────────────────────────
-  # 3. Real PyPI publish. Only runs if TestPyPI succeeded.
+  # 2. Publish to PyPI via Trusted Publishing (OIDC, no API token).
   # ─────────────────────────────────────────────────────────────────────
   publish-pypi:
     name: Publish to PyPI
-    needs: publish-testpypi
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -123,7 +97,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
 
   # ─────────────────────────────────────────────────────────────────────
-  # 4. Create the GitHub Release with auto-generated notes + dist files.
+  # 3. Create the GitHub Release with auto-generated notes + dist files.
   #    Runs in parallel with publish-pypi (no dependency between them).
   # ─────────────────────────────────────────────────────────────────────
   github-release:

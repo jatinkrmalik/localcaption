@@ -1,48 +1,44 @@
 # Releasing localcaption
 
-This project uses GitHub Actions + **PyPI Trusted Publishing (OIDC)** to
-release new versions. No PyPI tokens are stored anywhere.
+Releases are fully automated via GitHub Actions and **PyPI Trusted
+Publishing (OIDC)**. No PyPI API tokens are stored in GitHub Secrets.
 
-## One-time setup
+## One-time setup (≈ 3 minutes)
 
-Do this **once** before the first release. About 5 minutes.
+Do this once, before the first release.
 
-### 1. Register the project on PyPI and TestPyPI
+### 1. Register the project on PyPI as a "pending publisher"
 
-Both registries need to know about the project before they can accept a
-"pending publisher" claim. Easiest path: create the projects manually with
-a placeholder upload, or use Trusted Publishing's "pending publisher" flow
-(no upload needed).
+Trusted Publishing lets you claim a project name on PyPI without having to
+do a manual upload first.
 
-This guide uses the **pending publisher** flow because it requires zero
-prior uploads.
-
-### 2. Configure Trusted Publishing on **TestPyPI**
-
-1. Sign in to <https://test.pypi.org> (create the account if needed).
+1. Sign in to <https://pypi.org> (create the account if needed).
 2. Go to **Account settings → Publishing → Add a new pending publisher**.
 3. Fill in:
-   - **PyPI Project Name:** `localcaption`
-   - **Owner:** `jatinkrmalik`
-   - **Repository name:** `localcaption`
-   - **Workflow name:** `release.yml`
-   - **Environment name:** `testpypi`
+
+   | Field | Value |
+   |---|---|
+   | PyPI Project Name | `localcaption` |
+   | Owner | `jatinkrmalik` |
+   | Repository name | `localcaption` |
+   | Workflow name | `release.yml` |
+   | Environment name | `pypi` |
+
 4. Click **Add**.
 
-### 3. Configure Trusted Publishing on **PyPI** (production)
+PyPI will now trust uploads coming from `release.yml` running in the
+`pypi` environment of `jatinkrmalik/localcaption`, and from nothing else.
 
-Repeat step 2 at <https://pypi.org> with one difference:
-- **Environment name:** `pypi`
+### 2. Create the matching GitHub environment
 
-### 4. Create matching GitHub environments
+The workflow gates the publish job behind a GitHub Environment. This is
+where you can later add manual approval if you want a "are you sure?"
+checkpoint on every release.
 
-The workflow gates each publish job behind a GitHub Environment so you can
-add manual approval if you ever want a "human in the loop" step.
-
-In the repo: **Settings → Environments → New environment**, twice:
-- `testpypi` (no protection rules needed)
-- `pypi` (optional: add yourself as a required reviewer for an extra
-  "are you sure?" step on every release)
+1. In the repo: **Settings → Environments → New environment**.
+2. Name it exactly `pypi` (must match the value you used on PyPI).
+3. Optional: add yourself as a **Required reviewer** to gate every
+   release on a manual approval click.
 
 That's it for one-time setup.
 
@@ -53,7 +49,7 @@ That's it for one-time setup.
 git checkout main
 git pull
 
-# 2. Bump version in pyproject.toml (X.Y.Z, no leading 'v').
+# 2. Bump the version in pyproject.toml (X.Y.Z, no leading 'v').
 $EDITOR pyproject.toml
 
 # 3. Move the [Unreleased] block in CHANGELOG.md under a new [X.Y.Z] header.
@@ -69,28 +65,31 @@ git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-The push of the `v*` tag triggers `.github/workflows/release.yml`, which:
+The push of the `v*` tag triggers `.github/workflows/release.yml`, which
+runs three jobs:
 
 1. **build** — produces `dist/*.whl` + `dist/*.tar.gz`, runs `twine check
-   --strict`, and verifies that `pyproject.toml` version matches the tag.
-2. **publish-testpypi** — uploads to <https://test.pypi.org>. If anything
-   is wrong with the metadata, the release stops here and PyPI is untouched.
-3. **publish-pypi** — uploads to <https://pypi.org>. Only runs after
-   TestPyPI succeeded.
-4. **github-release** — creates a GitHub Release page with auto-generated
-   notes and the wheel + sdist attached.
+   --strict`, and verifies that `pyproject.toml` version matches the tag
+   (hard failure if not).
+2. **publish-pypi** — uploads to <https://pypi.org> via OIDC.
+3. **github-release** — creates a GitHub Release page with auto-generated
+   notes and the wheel + sdist attached. Runs in parallel with publish-pypi.
 
-About 2–3 minutes end to end.
+About 1–2 minutes end to end. Watch it with:
+
+```bash
+gh run watch --repo jatinkrmalik/localcaption
+```
 
 ## Verifying a release
 
 After CI goes green:
 
 ```bash
-# Real PyPI
+# Should list the new version
 pip index versions localcaption
 
-# Install in a throwaway env
+# Install it in a throwaway env to smoke-test
 pipx install --force --suffix=-test localcaption
 localcaption-test --version
 ```
@@ -100,8 +99,9 @@ localcaption-test --version
 PyPI does **not** allow re-uploading the same version, even if you delete
 it. The recipe is:
 
-1. Yank the bad version on pypi.org (Project page → Manage → Yank). Yanked
-   versions remain installable by exact pin but are hidden from `pip install
-   localcaption` resolvers.
-2. Bump to the next patch version.
+1. **Yank** the bad version on pypi.org (Project page → Manage → Yank).
+   Yanked versions stay installable by exact pin (so anyone who already
+   pinned to it isn't broken) but disappear from `pip install localcaption`
+   resolvers.
+2. Bump to the next patch version in `pyproject.toml`.
 3. Tag and push as normal.
