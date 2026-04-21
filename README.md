@@ -3,9 +3,9 @@
 > Paste a YouTube URL, get a transcript. **Fully local, no API keys.**
 
 <!-- Package & versioning -->
-[![PyPI version](https://img.shields.io/pypi/v/localcaption?logo=pypi&logoColor=white&color=%233775A9)](https://pypi.org/project/localcaption/)
-[![Python versions](https://img.shields.io/pypi/pyversions/localcaption?logo=python&logoColor=white)](https://pypi.org/project/localcaption/)
-[![PyPI downloads](https://img.shields.io/pypi/dm/localcaption?logo=pypi&logoColor=white&label=downloads%2Fmo&color=%23306998)](https://pypistats.org/packages/localcaption)
+[![PyPI version](https://img.shields.io/pypi/v/localcaption?logo=pypi&logoColor=white&color=%233775A9&cacheSeconds=300)](https://pypi.org/project/localcaption/)
+[![Python versions](https://img.shields.io/pypi/pyversions/localcaption?logo=python&logoColor=white&cacheSeconds=300)](https://pypi.org/project/localcaption/)
+[![GitHub release downloads](https://img.shields.io/github/downloads/jatinkrmalik/localcaption/total?logo=github&label=release%20downloads&color=%23306998&cacheSeconds=300)](https://github.com/jatinkrmalik/localcaption/releases)
 [![License: MIT](https://img.shields.io/github/license/jatinkrmalik/localcaption?color=yellow)](LICENSE)
 
 <!-- Build & code quality -->
