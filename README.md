@@ -2,10 +2,24 @@
 
 > Paste a YouTube URL, get a transcript. **Fully local, no API keys.**
 
+<!-- Package & versioning -->
+[![PyPI version](https://img.shields.io/pypi/v/localcaption?logo=pypi&logoColor=white&color=%233775A9)](https://pypi.org/project/localcaption/)
+[![Python versions](https://img.shields.io/pypi/pyversions/localcaption?logo=python&logoColor=white)](https://pypi.org/project/localcaption/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/localcaption?logo=pypi&logoColor=white&label=downloads%2Fmo&color=%23306998)](https://pypistats.org/packages/localcaption)
+[![License: MIT](https://img.shields.io/github/license/jatinkrmalik/localcaption?color=yellow)](LICENSE)
+
+<!-- Build & code quality -->
 [![CI](https://github.com/jatinkrmalik/localcaption/actions/workflows/ci.yml/badge.svg)](https://github.com/jatinkrmalik/localcaption/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](pyproject.toml)
+[![Release](https://github.com/jatinkrmalik/localcaption/actions/workflows/release.yml/badge.svg)](https://github.com/jatinkrmalik/localcaption/actions/workflows/release.yml)
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Hatch project](https://img.shields.io/badge/%F0%9F%A5%9A-Hatch-4051b5.svg)](https://github.com/pypa/hatch)
+
+<!-- Repo activity & community -->
+[![GitHub release](https://img.shields.io/github/v/release/jatinkrmalik/localcaption?include_prereleases&label=latest%20release&logo=github)](https://github.com/jatinkrmalik/localcaption/releases)
+[![GitHub stars](https://img.shields.io/github/stars/jatinkrmalik/localcaption?style=flat&logo=github)](https://github.com/jatinkrmalik/localcaption/stargazers)
+[![Open issues](https://img.shields.io/github/issues/jatinkrmalik/localcaption?logo=github)](https://github.com/jatinkrmalik/localcaption/issues)
+[![Last commit](https://img.shields.io/github/last-commit/jatinkrmalik/localcaption?logo=github)](https://github.com/jatinkrmalik/localcaption/commits/main)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 `localcaption` is a tiny orchestrator over three battle-tested tools:
 
