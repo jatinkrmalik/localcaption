@@ -12,6 +12,11 @@ concurrency:
 
 env:
   PYTHON_VERSION: '3.12'
+  # Force JavaScript-based actions to run on the runner's Node.js 24, instead
+  # of the bundled Node.js 20 that triggers a deprecation warning every run.
+  # GitHub will switch this on by default starting 2026-06-02; opting in early.
+  # https://github.blog/changelog/2025-09-09-github-actions-node-20-deprecation/
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────
