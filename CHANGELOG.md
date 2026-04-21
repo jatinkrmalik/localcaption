@@ -8,6 +8,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`localcaption model` subcommand family** for first-class whisper model
+  management. No more shelling into `download-ggml-model.sh`. Subcommands:
+  - `localcaption model list` — show every supported model with size +
+    install status (works even before whisper.cpp is installed).
+  - `localcaption model info <name>` — show metadata for one model.
+  - `localcaption model download <name>` — native Python downloader with
+    progress bar, atomic writes (`.part` → rename), Ctrl-C safety, and
+    truncation detection.
+  - `localcaption model rm <name>` — remove an installed model with a
+    confirmation prompt (`-y` to skip).
+- **Auto-download prompt for the transcribe path.** Running
+  `localcaption --model small.en <url>` when `small.en` isn't installed now
+  asks whether to download it, instead of failing with a path. Pass
+  `--auto-download` to skip the prompt for scripted use.
+- New `scripts/uninstall.sh` — idempotent end-to-end uninstaller with
+  `--dry-run`, `--yes`, and `--keep-models` flags.
+- 31 new unit tests covering the model registry, download path (against a
+  local HTTP server), and CLI dispatch — total now 45.
+
+### Changed
+- `doctor` now prints **actionable, copy-pasteable fix hints** when checks
+  fail, including the new `localcaption model download <name>` recipe.
+- README has a new "Managing models" section with a model-picker table.
+- The new `model` subcommand supersedes [#1] (switching the install default
+  to `small.en`) — users now pick whatever model they want with one command.
+
+### Fixed
+- CI no longer prints the "Node.js 20 actions deprecated" warning on every
+  run; opted in early to GitHub's Node 24 runtime via
+  `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`.
+
+## [0.1.1] - 2026-04-21
+
+### Added
 - `scripts/install.sh` — one-line end-user installer that uses `pipx` for an
   isolated install and bootstraps `whisper.cpp` + a default model into
   `~/.local/share/localcaption/whisper.cpp` (XDG-compliant). After install,
@@ -22,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `localcaption` invoked with no arguments now prints top-level help and
   exits with code 2 (was: argparse error). Existing `localcaption <url>`
   usage is unchanged.
+
+[#1]: https://github.com/jatinkrmalik/localcaption/issues/1
 
 ## [0.1.0] - 2026-04-21
 

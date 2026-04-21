@@ -105,12 +105,19 @@ if [[ -z "${BIN_PATH}" ]]; then
 fi
 
 # --- 5. Download model ----------------------------------------------------
+# Prefer `localcaption model download` (single source of truth, atomic writes,
+# progress bar, friendly errors). Fall back to whisper.cpp's bash script if
+# `localcaption` isn't on PATH yet (rare race; pipx may need a shell rehash).
 MODEL_FILE="${WHISPER_DIR}/models/ggml-${MODEL}.bin"
-if [[ ! -f "${MODEL_FILE}" ]]; then
-  log "Downloading whisper model: ${MODEL}"
-  bash "${WHISPER_DIR}/models/download-ggml-model.sh" "${MODEL}"
-else
+if [[ -f "${MODEL_FILE}" ]]; then
   log "Model already present: ${MODEL_FILE}"
+elif command -v localcaption >/dev/null 2>&1; then
+  log "Downloading whisper model: ${MODEL} (via 'localcaption model download')"
+  LOCALCAPTION_WHISPER_DIR="${WHISPER_DIR}" \
+    localcaption model download "${MODEL}"
+else
+  log "Downloading whisper model: ${MODEL} (via whisper.cpp's bash script)"
+  bash "${WHISPER_DIR}/models/download-ggml-model.sh" "${MODEL}"
 fi
 
 # --- 6. Done --------------------------------------------------------------

@@ -98,13 +98,83 @@ def _build_transcribe_parser() -> argparse.ArgumentParser:
         "--no-print", action="store_true",
         help="do not echo the transcript to stdout when finished",
     )
+    parser.add_argument(
+        "--auto-download", action="store_true",
+        help="if the requested model isn't installed, download it without asking",
+    )
     parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {__version__}")
     return parser
+
+
+def _ensure_model_available(model: str, whisper_dir: Path, auto: bool) -> bool:
+    """If the requested model isn't installed, prompt and download it.
+
+    Returns True if the model is now available, False otherwise.
+    Errors are logged but never raised — caller decides what to do.
+    """
+    from . import models  # local import → keeps `localcaption --help` cheap
+
+    target = models.model_path(whisper_dir, model)
+    if target.is_file():
+        return True
+
+    # Unknown model? Don't even try to download — fail loud.
+    try:
+        spec = models.get_model(model)
+    except LocalCaptionError as exc:
+        log.error(str(exc))
+        return False
+
+    print(
+        f"\nModel '{spec.name}' is not installed "
+        f"(~{_format_size_mb(spec.approx_size_mb)})."
+    )
+
+    if auto:
+        proceed = True
+    elif not sys.stdin.isatty():
+        # Non-interactive (CI, piped stdin) without --auto-download → refuse.
+        log.error(
+            f"Cannot prompt to download {spec.name!r} (stdin is not a TTY).\n"
+            f"  Pass --auto-download, or run: localcaption model download {spec.name}"
+        )
+        return False
+    else:
+        try:
+            reply = input("  Download it now? [Y/n] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print("\nCancelled.")
+            return False
+        proceed = reply in {"", "y", "yes"}
+
+    if not proceed:
+        print(
+            f"  Skipped. Run: localcaption model download {spec.name}\n"
+            "  Or use a different model with --model <name>."
+        )
+        return False
+
+    try:
+        models.download_model(spec.name, whisper_dir)
+    except LocalCaptionError as exc:
+        log.error(str(exc))
+        return False
+    except KeyboardInterrupt:
+        log.error("interrupted; partial download cleaned up.")
+        return False
+    return True
 
 
 def _cmd_transcribe(argv: list[str]) -> int:
     args = _build_transcribe_parser().parse_args(argv)
     whisper_dir = args.whisper_dir or _default_whisper_dir()
+
+    # Pre-flight: ensure the requested model is on disk before doing the (slow)
+    # download+ffmpeg dance. Cheap if already installed, helpful if not.
+    if whisper_dir.is_dir() and not _ensure_model_available(
+        args.model, whisper_dir, args.auto_download
+    ):
+        return 1
 
     try:
         result = transcribe_url(
@@ -201,8 +271,10 @@ def _cmd_doctor(argv: list[str]) -> int:
             else:
                 all_ok &= _check("models present", False, f"no ggml-*.bin in {models_dir}")
                 fix_hints.append(
-                    "No ggml-*.bin model files found. To download the default model:\n"
-                    f"    bash {models_dir}/download-ggml-model.sh base.en"
+                    "No whisper models are installed. To list, pick, and download one:\n"
+                    "    localcaption model list\n"
+                    "    localcaption model download base.en   # ~142 MB; English-only\n"
+                    "    localcaption model download small.en  # ~466 MB; better quality"
                 )
         else:
             all_ok &= _check("models directory", False, str(models_dir))
@@ -250,10 +322,207 @@ def _cmd_doctor(argv: list[str]) -> int:
 
 # --- top-level dispatcher -------------------------------------------------
 
+# ──────────────────────────────────────────────────────────────────────
+# `model` subcommand family
+# ──────────────────────────────────────────────────────────────────────
+
+
+def _format_size_mb(mb: int) -> str:
+    if mb >= 1024:
+        return f"{mb / 1024:.1f} GB"
+    return f"{mb} MB"
+
+
+def _cmd_model(argv: list[str]) -> int:
+    """Dispatch `localcaption model {list,download,rm,info}`."""
+    if not argv or argv[0] in {"-h", "--help", "help"}:
+        print(
+            "usage: localcaption model <subcommand> [options]\n\n"
+            "subcommands:\n"
+            "  list                list every supported model + install status\n"
+            "  download <name>     download a model (e.g. small.en)\n"
+            "  rm <name>           remove an installed model\n"
+            "  info <name>         show details about one model\n"
+        )
+        return 0 if argv and argv[0] in {"-h", "--help", "help"} else 2
+
+    sub = argv[0]
+    rest = argv[1:]
+    if sub == "list":
+        return _cmd_model_list(rest)
+    if sub == "download":
+        return _cmd_model_download(rest)
+    if sub in {"rm", "remove", "delete"}:
+        return _cmd_model_rm(rest)
+    if sub == "info":
+        return _cmd_model_info(rest)
+
+    print(f"localcaption model: unknown subcommand: {sub}", file=sys.stderr)
+    print("Run `localcaption model --help` to see available subcommands.", file=sys.stderr)
+    return 2
+
+
+def _cmd_model_list(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="localcaption model list")
+    parser.add_argument("--whisper-dir", type=Path, default=None,
+                        help="override whisper.cpp location")
+    args = parser.parse_args(argv)
+
+    # Avoid an immediate crash when whisper.cpp isn't installed yet — we still
+    # want to be able to LIST models (so the user can decide what to download).
+    whisper_dir = args.whisper_dir or _default_whisper_dir()
+
+    # We don't import models at top of file to keep CLI startup lean
+    from . import models
+
+    table = models.list_status(whisper_dir)
+
+    print("Models available for download (from whisper.cpp upstream):\n")
+    print(f"  {'Name':<18}{'Size':>10}   Status")
+    print(f"  {'-' * 18:<18}{'-' * 10:>10}   {'-' * 11}")
+    for row in table:
+        size = _format_size_mb(row.spec.approx_size_mb)
+        status = "✅ installed" if row.is_installed else "not installed"
+        print(f"  {row.spec.name:<18}{size:>10}   {status}")
+
+    orphans = models.orphaned_installed_models(whisper_dir)
+    if orphans:
+        print("\nOther models found on disk (not in localcaption's registry):")
+        for name in orphans:
+            print(f"  {name}")
+        print("These work fine with `--model <name>`; they just aren't shown above.")
+
+    print(f"\nInstall location: {models.WhisperPaths(whisper_dir).models_dir}")
+    print("\nTips:")
+    print("  • Multilingual variants (no .en suffix) are required for non-English audio.")
+    print("  • small.en is a great default for English podcasts/lectures.")
+    print("  • To download:    localcaption model download small.en")
+    print("  • To remove:      localcaption model rm small.en")
+    return 0
+
+
+def _cmd_model_info(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="localcaption model info")
+    parser.add_argument("name", help="model name (e.g. small.en)")
+    parser.add_argument("--whisper-dir", type=Path, default=None,
+                        help="override whisper.cpp location")
+    args = parser.parse_args(argv)
+
+    from . import models
+    try:
+        spec = models.get_model(args.name)
+    except LocalCaptionError as exc:
+        print(f"localcaption: {exc}", file=sys.stderr)
+        return 2
+
+    whisper_dir = args.whisper_dir or _default_whisper_dir()
+    target = models.model_path(whisper_dir, spec.name)
+    installed = target.is_file()
+
+    print(f"Model:        {spec.name}")
+    print(f"Description:  {spec.description}")
+    print(f"Approx size:  {_format_size_mb(spec.approx_size_mb)}")
+    print(f"Language:     {'English-only' if spec.is_english_only else 'multilingual'}")
+    print(f"Source URL:   {spec.url}")
+    print(f"Local path:   {target}")
+    if installed:
+        actual_mb = max(1, target.stat().st_size // (1024 * 1024))
+        print(f"Installed:    yes ({actual_mb} MB on disk)")
+    else:
+        print("Installed:    no")
+        print(f"\nDownload with:  localcaption model download {spec.name}")
+    return 0
+
+
+def _cmd_model_download(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="localcaption model download")
+    parser.add_argument("name", help="model name (e.g. small.en)")
+    parser.add_argument("--whisper-dir", type=Path, default=None,
+                        help="override whisper.cpp location")
+    parser.add_argument("--force", action="store_true",
+                        help="re-download even if the model is already present")
+    args = parser.parse_args(argv)
+
+    from . import models
+
+    whisper_dir = args.whisper_dir or _default_whisper_dir()
+    if not whisper_dir.is_dir():
+        print(
+            f"localcaption: whisper.cpp not found at {whisper_dir}.\n"
+            "  Install it first: see `localcaption doctor`.",
+            file=sys.stderr,
+        )
+        return 1
+
+    try:
+        spec = models.get_model(args.name)
+    except LocalCaptionError as exc:
+        print(f"localcaption: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"▸ Downloading whisper model: {spec.name} (~{_format_size_mb(spec.approx_size_mb)})")
+    try:
+        path = models.download_model(spec.name, whisper_dir, force=args.force)
+    except LocalCaptionError as exc:
+        print(f"\nlocalcaption: {exc}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print("\nlocalcaption: interrupted; partial download cleaned up.", file=sys.stderr)
+        return 130
+
+    print(f"✅ Done. {path}")
+    print(f"   Use it with: localcaption --model {spec.name} <url>")
+    return 0
+
+
+def _cmd_model_rm(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="localcaption model rm")
+    parser.add_argument("name", help="model name (e.g. small.en)")
+    parser.add_argument("--whisper-dir", type=Path, default=None,
+                        help="override whisper.cpp location")
+    parser.add_argument("-y", "--yes", action="store_true",
+                        help="skip the confirmation prompt")
+    args = parser.parse_args(argv)
+
+    from . import models
+
+    whisper_dir = args.whisper_dir or _default_whisper_dir()
+    target = models.model_path(whisper_dir, args.name)
+    if not target.is_file():
+        print(
+            f"localcaption: model {args.name!r} is not installed at {target}\n"
+            "  Run `localcaption model list` to see installed models.",
+            file=sys.stderr,
+        )
+        return 1
+
+    size_mb = max(1, target.stat().st_size // (1024 * 1024))
+    print(f"About to remove: {target} ({_format_size_mb(size_mb)})")
+    if not args.yes:
+        try:
+            reply = input("Continue? [y/N] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print("\nCancelled.", file=sys.stderr)
+            return 130
+        if reply not in {"y", "yes"}:
+            print("Cancelled.")
+            return 0
+
+    try:
+        models.remove_model(args.name, whisper_dir)
+    except LocalCaptionError as exc:
+        print(f"localcaption: {exc}", file=sys.stderr)
+        return 1
+
+    print("✓ Removed.")
+    return 0
+
+
 def _print_top_level_help() -> None:
     print("""\
 usage: localcaption <url> [options]            transcribe a video (default)
        localcaption doctor                     diagnose your install
+       localcaption model <subcommand>         list / download / remove models
        localcaption --help                     show transcribe help
        localcaption --version                  print version
 
@@ -278,6 +547,8 @@ def main(argv: list[str] | None = None) -> int:
     # Explicit subcommands.
     if head == "doctor":
         return _cmd_doctor(argv[1:])
+    if head == "model":
+        return _cmd_model(argv[1:])
     if head == "transcribe":
         return _cmd_transcribe(argv[1:])
 
