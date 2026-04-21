@@ -2,23 +2,20 @@
 
 > Paste a YouTube URL, get a transcript. **Fully local, no API keys.**
 
-<!-- Package & versioning -->
+<!-- Package: where to get it, what versions, what license -->
 [![PyPI version](https://img.shields.io/pypi/v/localcaption?logo=pypi&logoColor=white&color=%233775A9&cacheSeconds=300)](https://pypi.org/project/localcaption/)
 [![Python versions](https://img.shields.io/pypi/pyversions/localcaption?logo=python&logoColor=white&cacheSeconds=300)](https://pypi.org/project/localcaption/)
-[![GitHub release downloads](https://img.shields.io/github/downloads/jatinkrmalik/localcaption/total?logo=github&label=release%20downloads&color=%23306998&cacheSeconds=300)](https://github.com/jatinkrmalik/localcaption/releases)
 [![License: MIT](https://img.shields.io/github/license/jatinkrmalik/localcaption?color=yellow)](LICENSE)
 
-<!-- Build & code quality -->
+<!-- Build & quality: is the code actually working -->
 [![CI](https://github.com/jatinkrmalik/localcaption/actions/workflows/ci.yml/badge.svg)](https://github.com/jatinkrmalik/localcaption/actions/workflows/ci.yml)
 [![Release](https://github.com/jatinkrmalik/localcaption/actions/workflows/release.yml/badge.svg)](https://github.com/jatinkrmalik/localcaption/actions/workflows/release.yml)
-[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Hatch project](https://img.shields.io/badge/%F0%9F%A5%9A-Hatch-4051b5.svg)](https://github.com/pypa/hatch)
 
-<!-- Repo activity & community -->
-[![GitHub release](https://img.shields.io/github/v/release/jatinkrmalik/localcaption?include_prereleases&label=latest%20release&logo=github)](https://github.com/jatinkrmalik/localcaption/releases)
+<!-- Activity & community: is anyone maintaining and using this -->
 [![GitHub stars](https://img.shields.io/github/stars/jatinkrmalik/localcaption?style=flat&logo=github)](https://github.com/jatinkrmalik/localcaption/stargazers)
-[![Open issues](https://img.shields.io/github/issues/jatinkrmalik/localcaption?logo=github)](https://github.com/jatinkrmalik/localcaption/issues)
 [![Last commit](https://img.shields.io/github/last-commit/jatinkrmalik/localcaption?logo=github)](https://github.com/jatinkrmalik/localcaption/commits/main)
+[![Open issues](https://img.shields.io/github/issues/jatinkrmalik/localcaption?logo=github)](https://github.com/jatinkrmalik/localcaption/issues)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 `localcaption` is a tiny orchestrator over three battle-tested tools:
