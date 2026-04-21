@@ -3,28 +3,39 @@
   'primaryBorderColor':'#3B82F6',
   'primaryTextColor':'#1E3A8A',
   'lineColor':'#1E3A8A',
-  'fontFamily':'Inter, system-ui, sans-serif'
+  'fontFamily':'Inter, system-ui, sans-serif',
+  'clusterBkg':'#F8FAFC',
+  'clusterBorder':'#94A3B8'
 }}}%%
 flowchart LR
-    URL([🌐 YouTube URL]):::input
+    URL(["🌐 YouTube URL"]):::input
 
     subgraph S1["Stage 1 — download"]
-        YT["yt-dlp<br/><i>Python API</i>"]:::tool
-        AUDIO[("🎧 audio<br/>m4a / webm / opus")]:::artifact
+        direction LR
+        YT(["yt-dlp<br/><i>Python API</i>"]):::tool
+        AUDIO[/"🎧 audio<br/>m4a · webm · opus"/]:::artifact
+        YT --> AUDIO
     end
 
     subgraph S2["Stage 2 — re-encode"]
-        FF["ffmpeg"]:::tool
-        WAV[("🔊 16 kHz mono<br/>PCM WAV")]:::artifact
+        direction LR
+        FF(["ffmpeg"]):::tool
+        WAV[/"🔊 16 kHz mono<br/>PCM WAV"/]:::artifact
+        FF --> WAV
     end
 
     subgraph S3["Stage 3 — transcribe"]
-        WCPP["whisper.cpp<br/><i>Metal / CUDA / CPU</i>"]:::tool
-        OUT[("📝 .txt · .srt<br/>.vtt · .json")]:::artifact
+        direction LR
+        WCPP(["whisper.cpp<br/><i>Metal · CUDA · CPU</i>"]):::tool
+        OUT[/"📝 transcript<br/>.txt · .srt · .vtt · .json"/]:::output
     end
 
-    URL --> YT --> AUDIO --> FF --> WAV --> WCPP --> OUT
+    URL --> YT
+    AUDIO --> FF
+    WAV --> WCPP
+    WCPP --> OUT
 
-    classDef input    fill:#FEF3C7,stroke:#D97706,color:#78350F,font-weight:bold;
-    classDef tool     fill:#DBEAFE,stroke:#3B82F6,color:#1E3A8A,font-weight:bold;
-    classDef artifact fill:#DCFCE7,stroke:#16A34A,color:#14532D;
+    classDef input    fill:#FEF3C7,stroke:#D97706,color:#78350F,font-weight:bold,stroke-width:2px;
+    classDef tool     fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A,font-weight:bold,stroke-width:2px;
+    classDef artifact fill:#FEFCE8,stroke:#A16207,color:#713F12,stroke-width:1.5px;
+    classDef output   fill:#DCFCE7,stroke:#16A34A,color:#14532D,font-weight:bold,stroke-width:2px;
