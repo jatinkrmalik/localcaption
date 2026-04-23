@@ -17,7 +17,6 @@ import pytest
 from localcaption import installer
 from localcaption.errors import InstallError
 
-
 # --- Detection ------------------------------------------------------------
 
 
