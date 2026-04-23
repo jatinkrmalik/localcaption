@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "localcaption"
-version = "0.1.0"
+version = "0.2.0"
 description = "Fully-local YouTube → transcript pipeline using yt-dlp, ffmpeg, and whisper.cpp. No API keys."
 readme = "README.md"
 requires-python = ">=3.10"
