@@ -212,29 +212,39 @@ def _check(label: str, ok: bool, detail: str = "") -> bool:
     return ok
 
 
-def _cmd_doctor(argv: list[str]) -> int:
-    """Diagnose a localcaption install: prereqs, whisper.cpp, models."""
-    parser = argparse.ArgumentParser(
-        prog="localcaption doctor",
-        description="Diagnose a localcaption install: external tools, "
-                    "whisper.cpp build, available models.",
-    )
-    parser.add_argument(
-        "--whisper-dir", type=Path, default=None,
-        help="check this whisper.cpp directory (default: auto-detect)",
-    )
-    args = parser.parse_args(argv)
+def _run_doctor_diagnostics(whisper_dir: Path) -> tuple[bool, list[str], dict[str, bool]]:
+    """Run all diagnostic checks and print results.
 
-    print(f"localcaption {__version__}\n")
+    Returns ``(all_ok, fix_hints, gaps)`` where ``gaps`` is a flag-bag the
+    ``--fix`` path consumes to decide which install steps to run:
 
+        {
+            "ffmpeg":   bool,   # missing system tool
+            "cmake":    bool,
+            "git":      bool,
+            "whisper":  bool,   # whisper.cpp missing or unbuilt
+            "model":    bool,   # no ggml-*.bin model present
+        }
+    """
+    gaps = {"ffmpeg": False, "cmake": False, "git": False,
+            "whisper": False, "model": False}
+    fix_hints: list[str] = []
     all_ok = True
 
     print("System tools:")
     all_ok &= _check("python", True, sys.version.split()[0])
     ff = shutil.which("ffmpeg")
     all_ok &= _check("ffmpeg", ff is not None, ff or "missing — `brew install ffmpeg`")
+    if ff is None:
+        gaps["ffmpeg"] = True
+    cm = shutil.which("cmake")
+    all_ok &= _check("cmake", cm is not None, cm or "missing — needed to build whisper.cpp")
+    if cm is None:
+        gaps["cmake"] = True
     git = shutil.which("git")
     all_ok &= _check("git", git is not None, git or "missing")
+    if git is None:
+        gaps["git"] = True
 
     print("\nPython dependencies:")
     try:
@@ -245,9 +255,7 @@ def _cmd_doctor(argv: list[str]) -> int:
         all_ok &= _check("yt-dlp", False, "missing — `pip install yt-dlp`")
 
     print("\nwhisper.cpp:")
-    whisper_dir = args.whisper_dir or _default_whisper_dir()
     print(f"  searching: {whisper_dir}")
-    fix_hints: list[str] = []
 
     if whisper_dir.is_dir():
         _check("directory exists", True, str(whisper_dir))
@@ -257,10 +265,12 @@ def _cmd_doctor(argv: list[str]) -> int:
             all_ok &= _check("binary built", True, str(binary))
         except LocalCaptionError as exc:
             all_ok &= _check("binary built", False, str(exc).splitlines()[0])
+            gaps["whisper"] = True
             fix_hints.append(
                 "whisper.cpp directory exists but isn't built. To build it:\n"
                 f"    cd {whisper_dir}\n"
-                "    cmake -B build && cmake --build build -j --config Release"
+                "    cmake -B build && cmake --build build -j --config Release\n"
+                "    (or just run: localcaption doctor --fix)"
             )
 
         models_dir = paths.models_dir
@@ -270,32 +280,39 @@ def _cmd_doctor(argv: list[str]) -> int:
                 _check("models present", True, ", ".join(available))
             else:
                 all_ok &= _check("models present", False, f"no ggml-*.bin in {models_dir}")
+                gaps["model"] = True
                 fix_hints.append(
                     "No whisper models are installed. To list, pick, and download one:\n"
                     "    localcaption model list\n"
                     "    localcaption model download base.en   # ~142 MB; English-only\n"
-                    "    localcaption model download small.en  # ~466 MB; better quality"
+                    "    localcaption model download small.en  # ~466 MB; better quality\n"
+                    "    (or just run: localcaption doctor --fix)"
                 )
         else:
             all_ok &= _check("models directory", False, str(models_dir))
+            gaps["model"] = True
             fix_hints.append(
                 f"models/ subdirectory missing under {whisper_dir} — "
                 "your whisper.cpp clone may be incomplete; re-clone it."
             )
     else:
         all_ok &= _check("directory exists", False, str(whisper_dir))
+        gaps["whisper"] = True
+        gaps["model"] = True
         fix_hints.append(
             "whisper.cpp is not installed. Pick ONE of:\n\n"
-            "  Option A — let our installer do it for you:\n"
+            "  Option A — let localcaption install it for you:\n"
+            "    localcaption doctor --fix\n\n"
+            "  Option B — bootstrap from scratch (also installs localcaption):\n"
             "    curl -fsSL https://raw.githubusercontent.com/jatinkrmalik/"
             "localcaption/main/scripts/install.sh | bash\n\n"
-            "  Option B — DIY, anywhere you like:\n"
+            "  Option C — DIY, anywhere you like:\n"
             "    git clone https://github.com/ggerganov/whisper.cpp \\\n"
             "        ~/.local/share/localcaption/whisper.cpp\n"
             "    cd ~/.local/share/localcaption/whisper.cpp\n"
             "    cmake -B build && cmake --build build -j --config Release\n"
             "    bash models/download-ggml-model.sh base.en\n\n"
-            "  Option C — point us at an existing whisper.cpp checkout:\n"
+            "  Option D — point us at an existing whisper.cpp checkout:\n"
             "    export LOCALCAPTION_WHISPER_DIR=/path/to/your/whisper.cpp\n"
             "    # add that line to your shell rc to make it stick"
         )
@@ -305,19 +322,110 @@ def _cmd_doctor(argv: list[str]) -> int:
         marker = "✓" if c.is_dir() else "·"
         print(f"  {marker} {c}")
 
-    if fix_hints:
-        print("\nHow to fix:\n")
-        for hint in fix_hints:
-            for line in hint.splitlines():
-                print(f"  {line}" if line else "")
-            print()
+    return all_ok, fix_hints, gaps
+
+
+def _apply_doctor_fix(whisper_dir: Path, gaps: dict[str, bool], model: str) -> bool:
+    """Try to repair the gaps found by the diagnostic sweep.
+
+    Returns ``True`` if every attempted fix succeeded, ``False`` otherwise.
+    Each step is best-effort: a single failure is reported and the remaining
+    steps are skipped (the user can re-run after addressing the root cause).
+    """
+    from . import installer, models  # local imports keep --help cheap
+
+    print("\nAttempting fixes:\n")
+
+    # 1. System dependencies first (whisper build needs cmake & git).
+    for dep in ("git", "cmake", "ffmpeg"):
+        if gaps.get(dep):
+            print(f"▸ Installing system dependency: {dep}")
+            try:
+                installer.install_system_dep(dep)
+            except LocalCaptionError as exc:
+                print(f"  ❌ Could not install {dep}: {exc}")
+                return False
+            print(f"  ✅ {dep} installed")
+
+    # 2. whisper.cpp clone + build.
+    if gaps.get("whisper"):
+        print(f"▸ Installing whisper.cpp into {whisper_dir}")
+        try:
+            binary = installer.ensure_whisper_cpp(whisper_dir)
+        except LocalCaptionError as exc:
+            print(f"  ❌ Could not install whisper.cpp: {exc}")
+            return False
+        print(f"  ✅ whisper.cpp ready ({binary})")
+
+    # 3. Default model download (uses the same registry as `model download`).
+    if gaps.get("model"):
+        print(f"▸ Downloading model: {model}")
+        try:
+            target = models.download_model(model, whisper_dir)
+        except LocalCaptionError as exc:
+            print(f"  ❌ Could not download model: {exc}")
+            return False
+        print(f"  ✅ model downloaded ({target})")
+
+    return True
+
+
+def _cmd_doctor(argv: list[str]) -> int:
+    """Diagnose a localcaption install. With ``--fix``, also try to repair it."""
+    parser = argparse.ArgumentParser(
+        prog="localcaption doctor",
+        description="Diagnose a localcaption install: external tools, "
+                    "whisper.cpp build, available models. "
+                    "Use --fix to attempt automatic repair.",
+    )
+    parser.add_argument(
+        "--whisper-dir", type=Path, default=None,
+        help="check this whisper.cpp directory (default: auto-detect)",
+    )
+    parser.add_argument(
+        "--fix", action="store_true",
+        help="attempt to install missing dependencies (ffmpeg/cmake), "
+             "clone+build whisper.cpp, and download the default model",
+    )
+    parser.add_argument(
+        "--model", default=DEFAULT_MODEL,
+        help=f"model to download when fixing a missing-model gap "
+             f"(default: {DEFAULT_MODEL})",
+    )
+    args = parser.parse_args(argv)
+
+    print(f"localcaption {__version__}\n")
+    whisper_dir = args.whisper_dir or _default_whisper_dir()
+
+    all_ok, fix_hints, gaps = _run_doctor_diagnostics(whisper_dir)
 
     if all_ok:
-        print("All checks passed. You're good to go: localcaption <url>")
+        print("\nAll checks passed. You're good to go: localcaption <url>")
         return 0
-    else:
-        print("Some checks failed. See 'How to fix' above.")
+
+    if not args.fix:
+        if fix_hints:
+            print("\nHow to fix:\n")
+            for hint in fix_hints:
+                for line in hint.splitlines():
+                    print(f"  {line}" if line else "")
+                print()
+        print("Some checks failed. See 'How to fix' above, or re-run with --fix.")
         return 1
+
+    # --fix path: try to repair, then re-run diagnostics for verification.
+    if not _apply_doctor_fix(whisper_dir, gaps, args.model):
+        print("\nFix aborted. Address the error above and re-run.")
+        return 1
+
+    print("\n" + "─" * 60)
+    print("Re-running diagnostics to verify…\n")
+    all_ok_after, _, _ = _run_doctor_diagnostics(whisper_dir)
+    if all_ok_after:
+        print("\nAll checks passed. You're good to go: localcaption <url>")
+        return 0
+    print("\nSome checks still failing — see output above.")
+    return 1
 
 
 # --- top-level dispatcher -------------------------------------------------

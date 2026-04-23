@@ -24,12 +24,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--auto-download` to skip the prompt for scripted use.
 - New `scripts/uninstall.sh` — idempotent end-to-end uninstaller with
   `--dry-run`, `--yes`, and `--keep-models` flags.
-- 31 new unit tests covering the model registry, download path (against a
-  local HTTP server), and CLI dispatch — total now 45.
+- **`localcaption doctor --fix`** — self-heals a broken or missing install
+  end to end: installs missing system tools (`ffmpeg`/`cmake`/`git`) via
+  `brew`/`apt`, clones + builds whisper.cpp at the canonical XDG location,
+  downloads the requested model, then re-runs the diagnostics for
+  verification. Idempotent (no-ops when already installed).
+- New internal `localcaption.installer` module wrapping the install
+  steps in pure Python (`subprocess`-based, no bash dependency) so the
+  same logic runs from `doctor --fix`, the `install.sh` bootstrap, and
+  any future entry point.
+- New `InstallError` exception type for typed install-step failures.
+- Unit tests: full coverage of `installer` (detection, subprocess
+  wrapper, brew/apt selection, clone+build sequencing) and four new
+  `doctor --fix` cases (read-only-by-default invariant, happy path,
+  abort on failure, `--fix` advertised in `--help`). 68 tests total.
 
 ### Changed
 - `doctor` now prints **actionable, copy-pasteable fix hints** when checks
-  fail, including the new `localcaption model download <name>` recipe.
+  fail, including the new `localcaption model download <name>` recipe and
+  the one-shot `localcaption doctor --fix` command.
+- `doctor` also checks for `cmake` (needed to build whisper.cpp).
+- `scripts/install.sh` slimmed from 134 → 91 lines: it now only handles
+  the bootstrap (Python + `pipx` + `pipx install localcaption`) and then
+  delegates the heavy lifting (whisper.cpp + model + system deps) to
+  `localcaption doctor --fix`. Single source of truth.
 - README has a new "Managing models" section with a model-picker table.
 - The new `model` subcommand supersedes [#1] (switching the install default
   to `small.en`) — users now pick whatever model they want with one command.

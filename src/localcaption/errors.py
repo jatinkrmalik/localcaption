@@ -25,3 +25,7 @@ class AudioConversionError(LocalCaptionError):
 
 class TranscriptionError(LocalCaptionError):
     """whisper.cpp failed to produce a transcript."""
+
+
+class InstallError(LocalCaptionError):
+    """An automated install step (system dep, whisper.cpp clone/build) failed."""

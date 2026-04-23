@@ -51,11 +51,23 @@ pipx install localcaption
 ```
 
 The first time you run `localcaption <url>` it will tell you it can't find
-`whisper.cpp`. To set it up (clone + build + download the default model),
-use **either** of:
+`whisper.cpp`. The fastest way to set it up is to let `localcaption` do it
+itself — clone, build, and download the default model in one shot:
 
 ```bash
-# Option A — let our installer do it (XDG-compliant, ~2 min on M-series Mac):
+localcaption doctor --fix          # ~2 min on an M-series Mac
+```
+
+`doctor --fix` is idempotent and end-to-end: it installs missing system
+tools (`ffmpeg`/`cmake` via `brew`/`apt`), clones + builds whisper.cpp at
+the canonical XDG location, downloads the default model, and re-runs the
+diagnostics to confirm everything works. Pick a different model with
+`--model small.en`.
+
+Prefer to do it yourself? Two equivalent options:
+
+```bash
+# Option A — bootstrap script (also installs pipx + the localcaption package):
 curl -fsSL https://raw.githubusercontent.com/jatinkrmalik/localcaption/main/scripts/install.sh | bash
 
 # Option B — DIY, anywhere you like:
@@ -65,17 +77,15 @@ bash models/download-ggml-model.sh base.en
 export LOCALCAPTION_WHISPER_DIR=/path/to/whisper.cpp   # add to your shell rc
 ```
 
-> 💡 **Already trust the install script?** Just run it directly — it'll do
-> `pipx install localcaption` for you, plus prereqs (`pipx`, `cmake` via
-> `brew`/`apt`) and the whisper.cpp bootstrap, all in one command:
-> `curl -fsSL https://raw.githubusercontent.com/jatinkrmalik/localcaption/main/scripts/install.sh | bash`
->
+> 💡 The `install.sh` bootstrap is just `pipx install localcaption` followed
+> by `localcaption doctor --fix` — same logic, single source of truth.
 > Override the default model with `WHISPER_MODEL=small.en bash install.sh`.
 
 After install, verify everything is wired up:
 
 ```bash
-localcaption doctor
+localcaption doctor                # read-only diagnostic
+localcaption doctor --fix          # diagnostic + auto-repair anything missing
 ```
 
 ### Uninstall
@@ -98,11 +108,12 @@ models cache for next time).
 Sample output:
 
 ```
-localcaption 0.1.0
+localcaption 0.2.0
 
 System tools:
   ✅ python  (3.12.3)
   ✅ ffmpeg  (/opt/homebrew/bin/ffmpeg)
+  ✅ cmake   (/opt/homebrew/bin/cmake)
   ✅ git     (/opt/homebrew/bin/git)
 
 Python dependencies:
@@ -115,6 +126,15 @@ whisper.cpp:
   ✅ models present  (ggml-base.en.bin)
 
 All checks passed. You're good to go: localcaption <url>
+```
+
+If anything is missing, re-run with `--fix` and `localcaption` will install
+the missing system deps (via `brew`/`apt`), clone+build whisper.cpp, and
+download the default model — then re-verify:
+
+```bash
+localcaption doctor --fix                      # repair everything
+localcaption doctor --fix --model small.en     # …with a specific model
 ```
 
 ### Dev install (contributors)
@@ -164,7 +184,8 @@ You can also invoke it as a module: `python -m localcaption <url>`.
 | Subcommand | What it does |
 |---|---|
 | _(default)_ `localcaption <url>` | Transcribe a single URL. |
-| `localcaption doctor` | Diagnose your install: prereqs, whisper.cpp, available models. Useful before filing a bug. |
+| `localcaption doctor` | Read-only diagnostic: prereqs, whisper.cpp, available models. Useful before filing a bug. |
+| `localcaption doctor --fix` | Self-heal: install missing system deps, clone+build whisper.cpp, download the default model, then re-verify. Idempotent. |
 | `localcaption model list` | List every supported whisper model with size + install status. |
 | `localcaption model info <name>` | Show metadata about a single model. |
 | `localcaption model download <name>` | Download a model with progress bar + atomic writes. |
