@@ -25,6 +25,12 @@ class PipelineResult:
     transcripts: TranscriptionResult
 
 
+def _is_local_file(source: str) -> bool:
+    if "://" in source:
+        return False
+    return Path(source).is_file()
+
+
 def transcribe_url(
     url: str,
     *,
@@ -36,10 +42,12 @@ def transcribe_url(
 ) -> PipelineResult:
     """Run the full pipeline on *url* and return the produced artefacts.
 
+    *url* may be an actual URL or a path to a local video/audio file.
+
     Parameters
     ----------
     url:
-        Any URL `yt-dlp` can resolve.
+        Any URL `yt-dlp` can resolve, or a local file path.
     out_dir:
         Directory for the final transcript files.
     whisper_dir:
@@ -59,7 +67,10 @@ def transcribe_url(
     audio_path: Path | None = None
     wav_path: Path | None = None
     try:
-        audio_path = download_audio(url, work_dir)
+        if _is_local_file(url):
+            audio_path = Path(url).resolve()
+        else:
+            audio_path = download_audio(url, work_dir)
         wav_path = work_dir / f"{audio_path.stem}.16k.wav"
         to_whisper_wav(audio_path, wav_path)
 
