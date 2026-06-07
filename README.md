@@ -51,11 +51,23 @@ pipx install localcaption
 ```
 
 The first time you run `localcaption <url>` it will tell you it can't find
-`whisper.cpp`. To set it up (clone + build + download the default model),
-use **either** of:
+`whisper.cpp`. The fastest way to set it up is to let `localcaption` do it
+itself — clone, build, and download the default model in one shot:
 
 ```bash
-# Option A — let our installer do it (XDG-compliant, ~2 min on M-series Mac):
+localcaption doctor --fix          # ~2 min on an M-series Mac
+```
+
+`doctor --fix` is idempotent and end-to-end: it installs missing system
+tools (`ffmpeg`/`cmake` via `brew`/`apt`), clones + builds whisper.cpp at
+the canonical XDG location, downloads the default model, and re-runs the
+diagnostics to confirm everything works. Pick a different model with
+`--model small.en`.
+
+Prefer to do it yourself? Two equivalent options:
+
+```bash
+# Option A — bootstrap script (also installs pipx + the localcaption package):
 curl -fsSL https://raw.githubusercontent.com/jatinkrmalik/localcaption/main/scripts/install.sh | bash
 
 # Option B — DIY, anywhere you like:
@@ -65,17 +77,15 @@ bash models/download-ggml-model.sh base.en
 export LOCALCAPTION_WHISPER_DIR=/path/to/whisper.cpp   # add to your shell rc
 ```
 
-> 💡 **Already trust the install script?** Just run it directly — it'll do
-> `pipx install localcaption` for you, plus prereqs (`pipx`, `cmake` via
-> `brew`/`apt`) and the whisper.cpp bootstrap, all in one command:
-> `curl -fsSL https://raw.githubusercontent.com/jatinkrmalik/localcaption/main/scripts/install.sh | bash`
->
+> 💡 The `install.sh` bootstrap is just `pipx install localcaption` followed
+> by `localcaption doctor --fix` — same logic, single source of truth.
 > Override the default model with `WHISPER_MODEL=small.en bash install.sh`.
 
 After install, verify everything is wired up:
 
 ```bash
-localcaption doctor
+localcaption doctor                # read-only diagnostic
+localcaption doctor --fix          # diagnostic + auto-repair anything missing
 ```
 
 ### Uninstall
@@ -98,11 +108,12 @@ models cache for next time).
 Sample output:
 
 ```
-localcaption 0.1.0
+localcaption 0.2.0
 
 System tools:
   ✅ python  (3.12.3)
   ✅ ffmpeg  (/opt/homebrew/bin/ffmpeg)
+  ✅ cmake   (/opt/homebrew/bin/cmake)
   ✅ git     (/opt/homebrew/bin/git)
 
 Python dependencies:
@@ -115,6 +126,15 @@ whisper.cpp:
   ✅ models present  (ggml-base.en.bin)
 
 All checks passed. You're good to go: localcaption <url>
+```
+
+If anything is missing, re-run with `--fix` and `localcaption` will install
+the missing system deps (via `brew`/`apt`), clone+build whisper.cpp, and
+download the default model — then re-verify:
+
+```bash
+localcaption doctor --fix                      # repair everything
+localcaption doctor --fix --model small.en     # …with a specific model
 ```
 
 ### Dev install (contributors)
@@ -164,7 +184,54 @@ You can also invoke it as a module: `python -m localcaption <url>`.
 | Subcommand | What it does |
 |---|---|
 | _(default)_ `localcaption <url>` | Transcribe a single URL. |
-| `localcaption doctor` | Diagnose your install: prereqs, whisper.cpp, available models. Useful before filing a bug. |
+| `localcaption doctor` | Read-only diagnostic: prereqs, whisper.cpp, available models. Useful before filing a bug. |
+| `localcaption doctor --fix` | Self-heal: install missing system deps, clone+build whisper.cpp, download the default model, then re-verify. Idempotent. |
+| `localcaption model list` | List every supported whisper model with size + install status. |
+| `localcaption model info <name>` | Show metadata about a single model. |
+| `localcaption model download <name>` | Download a model with progress bar + atomic writes. |
+| `localcaption model rm <name>` | Remove an installed model to free disk space. |
+
+### Managing models
+
+`localcaption` ships with a default `base.en` model (~142 MB). For better
+quality or non-English audio, switch models with `--model <name>`. If the
+model isn't already installed, you'll be prompted to download it:
+
+```bash
+$ localcaption --model small.en "https://www.youtube.com/watch?v=..."
+
+Model 'small.en' is not installed (~466 MB).
+  Download it now? [Y/n] y
+  small.en       [████████████████████░░░░░░░░░░░░░░░░] 290.0/466.0 MB · 18.4 MB/s · ETA 9s
+```
+
+Or download/manage models explicitly:
+
+```bash
+localcaption model list                  # see what's available
+localcaption model info small.en         # check size before committing
+localcaption model download small.en     # ~466 MB, ~25 sec on a fast connection
+localcaption model rm large-v3           # free 3 GB after experimenting
+```
+
+For scripted/CI use, pass `--auto-download` to skip the prompt:
+
+```bash
+localcaption --model small.en --auto-download "https://www.youtube.com/..."
+```
+
+**Quick model picker:**
+
+| Model | Size | Best for |
+|---|---|---|
+| `tiny.en` | 75 MB | Quick drafts, English only, low-resource environments |
+| `base.en` | 142 MB | Current install default, fast & decent |
+| `small.en` | 466 MB | **Recommended for English** — great accuracy/speed balance |
+| `medium.en` | 1.5 GB | High accuracy English, ~3× slower than `small.en` |
+| `large-v3` | 3.0 GB | Best accuracy, multilingual, slow |
+| `large-v3-turbo` | 1.6 GB | Near-large quality at ~half the size — great compromise |
+
+Models without the `.en` suffix are multilingual (required for non-English audio).
 
 ### Python API
 
@@ -272,12 +339,13 @@ criteria, and discussion):
 
 | # | Item | Labels |
 |---|---|---|
-| [#1](https://github.com/jatinkrmalik/localcaption/issues/1) | Switch default model from `base.en` to `small.en` | `good first issue` |
+| [#7](https://github.com/jatinkrmalik/localcaption/issues/7) | `localcaption model {list,download,rm,info}` subcommand | _shipped in v0.2.0_ ✅ |
 | [#2](https://github.com/jatinkrmalik/localcaption/issues/2) | Batch mode (`--batch urls.txt`) | `enhancement` |
 | [#3](https://github.com/jatinkrmalik/localcaption/issues/3) | Local auto-summary via Ollama (`--summary`) | `enhancement` |
 | [#4](https://github.com/jatinkrmalik/localcaption/issues/4) | Speaker diarization with pyannote.audio (`--diarize`) | `stretch`, `help wanted` |
 | [#5](https://github.com/jatinkrmalik/localcaption/issues/5) | YouTube chapters & grep-able search index | `enhancement` |
 | [#6](https://github.com/jatinkrmalik/localcaption/issues/6) | Pluggable transcription backends (faster-whisper / MLX) | `help wanted` |
+| ~~[#1](https://github.com/jatinkrmalik/localcaption/issues/1)~~ | ~~Switch default model from `base.en` to `small.en`~~ | _superseded by #7_ |
 
 **Have an idea?** Open a
 [feature request](https://github.com/jatinkrmalik/localcaption/issues/new/choose) —
