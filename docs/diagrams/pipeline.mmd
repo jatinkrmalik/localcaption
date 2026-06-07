@@ -1,30 +1,30 @@
 %%{init: {'theme':'base', 'themeVariables': {
-  'primaryColor':'#EFF6FF',
-  'primaryBorderColor':'#3B82F6',
-  'primaryTextColor':'#1E3A8A',
-  'lineColor':'#1E3A8A',
+  'primaryColor':'#F8FAFC',
+  'primaryBorderColor':'#CBD5E1',
+  'primaryTextColor':'#0F172A',
+  'lineColor':'#475569',
   'fontFamily':'Inter, system-ui, sans-serif',
   'clusterBkg':'#F8FAFC',
-  'clusterBorder':'#94A3B8'
+  'clusterBorder':'#CBD5E1'
 }}}%%
 flowchart LR
-    URL(["🌐 YouTube URL"]):::input
+    URL(["🌐 Video URL<br/><i>YouTube · Vimeo · Twitch · 1000+ sites</i>"]):::input
 
-    subgraph S1["Stage 1 — download"]
+    subgraph S1["Stage 1 · Download"]
         direction LR
         YT(["yt-dlp<br/><i>Python API</i>"]):::tool
         AUDIO[/"🎧 audio<br/>m4a · webm · opus"/]:::artifact
         YT --> AUDIO
     end
 
-    subgraph S2["Stage 2 — re-encode"]
+    subgraph S2["Stage 2 · Re-encode"]
         direction LR
         FF(["ffmpeg"]):::tool
         WAV[/"🔊 16 kHz mono<br/>PCM WAV"/]:::artifact
         FF --> WAV
     end
 
-    subgraph S3["Stage 3 — transcribe"]
+    subgraph S3["Stage 3 · Transcribe"]
         direction LR
         WCPP(["whisper.cpp<br/><i>Metal · CUDA · CPU</i>"]):::tool
         OUT[/"📝 transcript<br/>.txt · .srt · .vtt · .json"/]:::output

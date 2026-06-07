@@ -1,6 +1,8 @@
 # localcaption
 
-> Paste a YouTube URL, get a transcript. **Fully local, no API keys.**
+> Paste a video URL, get a transcript. **Fully local, no API keys.**
+>
+> Works with YouTube, Vimeo, Twitch, Twitter/X, and [1000+ other sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) via yt-dlp.
 
 <!-- Package: where to get it, what versions, what license -->
 [![PyPI version](https://img.shields.io/pypi/v/localcaption?logo=pypi&logoColor=white&color=%233775A9&cacheSeconds=300)](https://pypi.org/project/localcaption/)
@@ -22,7 +24,7 @@
 
 | Stage | Tool |
 |---|---|
-| Download bestaudio | [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) |
+| Download best audio | [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) (YouTube, Vimeo, Twitch, 1000+ sites) |
 | Re-encode to 16 kHz mono WAV | [`ffmpeg`](https://ffmpeg.org/) |
 | Transcribe locally | [`whisper.cpp`](https://github.com/ggerganov/whisper.cpp) |
 
@@ -52,7 +54,7 @@ pipx install localcaption
 
 The first time you run `localcaption <url>` it will tell you it can't find
 `whisper.cpp`. The fastest way to set it up is to let `localcaption` do it
-itself — clone, build, and download the default model in one shot:
+itself: clone, build, and download the default model in one shot:
 
 ```bash
 localcaption doctor --fix          # ~2 min on an M-series Mac
@@ -67,10 +69,10 @@ diagnostics to confirm everything works. Pick a different model with
 Prefer to do it yourself? Two equivalent options:
 
 ```bash
-# Option A — bootstrap script (also installs pipx + the localcaption package):
+# Option A: bootstrap script (also installs pipx + the localcaption package):
 curl -fsSL https://raw.githubusercontent.com/jatinkrmalik/localcaption/main/scripts/install.sh | bash
 
-# Option B — DIY, anywhere you like:
+# Option B: DIY, anywhere you like:
 git clone https://github.com/ggerganov/whisper.cpp /path/to/whisper.cpp
 cd /path/to/whisper.cpp && cmake -B build && cmake --build build -j --config Release
 bash models/download-ggml-model.sh base.en
@@ -78,7 +80,7 @@ export LOCALCAPTION_WHISPER_DIR=/path/to/whisper.cpp   # add to your shell rc
 ```
 
 > 💡 The `install.sh` bootstrap is just `pipx install localcaption` followed
-> by `localcaption doctor --fix` — same logic, single source of truth.
+> by `localcaption doctor --fix`, same logic, single source of truth.
 > Override the default model with `WHISPER_MODEL=small.en bash install.sh`.
 
 After install, verify everything is wired up:
@@ -91,7 +93,7 @@ localcaption doctor --fix          # diagnostic + auto-repair anything missing
 ### Uninstall
 
 To completely remove `localcaption` and everything it installed (the
-binary, whisper.cpp build, and ggml models — about 200 MB total):
+binary, whisper.cpp build, and ggml models (about 200 MB total):
 
 ```bash
 # pipx + whisper.cpp + models, with confirmation prompts:
@@ -130,7 +132,7 @@ All checks passed. You're good to go: localcaption <url>
 
 If anything is missing, re-run with `--fix` and `localcaption` will install
 the missing system deps (via `brew`/`apt`), clone+build whisper.cpp, and
-download the default model — then re-verify:
+download the default model, then re-verify:
 
 ```bash
 localcaption doctor --fix                      # repair everything
@@ -157,7 +159,11 @@ and editable-installs the package so source edits take effect immediately.
 ### CLI
 
 ```bash
+# YouTube
 localcaption "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+
+# Vimeo, Twitch, Twitter/X, and 1000+ other sites work too
+localcaption "https://vimeo.com/148751763"
 ```
 
 | flag | default | what it does |
@@ -226,10 +232,10 @@ localcaption --model small.en --auto-download "https://www.youtube.com/..."
 |---|---|---|
 | `tiny.en` | 75 MB | Quick drafts, English only, low-resource environments |
 | `base.en` | 142 MB | Current install default, fast & decent |
-| `small.en` | 466 MB | **Recommended for English** — great accuracy/speed balance |
+| `small.en` | 466 MB | **Recommended for English**, great accuracy/speed balance |
 | `medium.en` | 1.5 GB | High accuracy English, ~3× slower than `small.en` |
 | `large-v3` | 3.0 GB | Best accuracy, multilingual, slow |
-| `large-v3-turbo` | 1.6 GB | Near-large quality at ~half the size — great compromise |
+| `large-v3-turbo` | 1.6 GB | Near-large quality at ~half the size, great compromise |
 
 Models without the `.en` suffix are multilingual (required for non-English audio).
 
@@ -290,9 +296,9 @@ order-of-magnitude reference, not a competitive benchmark.
 
 | Video | Length | Wall-clock | Speed vs. realtime | Hardware |
 |---|---|---|---|---|
-| [TED-Ed — *How does your immune system work?*](https://www.youtube.com/watch?v=PSRJfaAYkW4) | 5:23   | **7.5 s**  | ~43× | MacBook Pro M4 Pro, 48 GB |
-| [3Blue1Brown — *But what is a Neural Network?*](https://www.youtube.com/watch?v=aircAruvnKk) | 18:40  | **19.3 s** | ~58× | MacBook Pro M4 Pro, 48 GB |
-| [Hasan Minhaj × Neil deGrasse Tyson — *Why AI is Overrated*](https://www.youtube.com/watch?v=BYizgB2FcAQ) | 54:17 | **49.8 s** | ~65× | MacBook Pro M4 Pro, 48 GB |
+| [TED-Ed: *How does your immune system work?*](https://www.youtube.com/watch?v=PSRJfaAYkW4) | 5:23   | **7.5 s**  | ~43× | MacBook Pro M4 Pro, 48 GB |
+| [3Blue1Brown: *But what is a Neural Network?*](https://www.youtube.com/watch?v=aircAruvnKk) | 18:40  | **19.3 s** | ~58× | MacBook Pro M4 Pro, 48 GB |
+| [Hasan Minhaj × Neil deGrasse Tyson: *Why AI is Overrated*](https://www.youtube.com/watch?v=BYizgB2FcAQ) | 54:17 | **49.8 s** | ~65× | MacBook Pro M4 Pro, 48 GB |
 
 <details>
 <summary>Reproduce</summary>
@@ -320,11 +326,12 @@ hardware in the **Hardware** column.
 
 - Bigger models = better quality but slower. `base.en` is a good default;
   try `small.en` if you have the patience and `tiny.en` for instant results.
-- Apple Silicon: whisper.cpp's CMake build uses Metal automatically — you'll
+- Apple Silicon: whisper.cpp's CMake build uses Metal automatically, you'll
   see `ggml_metal_init` in the logs.
-- The pipeline accepts any URL `yt-dlp` supports (Vimeo, Twitch VODs, podcast
-  pages, etc.), not just YouTube.
-- If you hit `HTTP 403 Forbidden`, your `yt-dlp` is probably stale —
+- The pipeline accepts any URL `yt-dlp` supports (Vimeo, Twitch VODs, Twitter/X,
+  podcast pages, and [1000+ more](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)),
+  not just YouTube.
+- If you hit `HTTP 403 Forbidden`, your `yt-dlp` is probably stale.
   `pip install -U yt-dlp` usually fixes it.
 
 ## Roadmap
@@ -348,7 +355,7 @@ criteria, and discussion):
 | ~~[#1](https://github.com/jatinkrmalik/localcaption/issues/1)~~ | ~~Switch default model from `base.en` to `small.en`~~ | _superseded by #7_ |
 
 **Have an idea?** Open a
-[feature request](https://github.com/jatinkrmalik/localcaption/issues/new/choose) —
+[feature request](https://github.com/jatinkrmalik/localcaption/issues/new/choose),
 or jump into [Discussions](https://github.com/jatinkrmalik/localcaption/discussions)
 if you want to chat about it first.
 
@@ -356,16 +363,16 @@ if you want to chat about it first.
 
 `localcaption` deliberately stays tiny. If you want more, check out:
 
-- [`whishper`](https://github.com/pluja/whishper) — full web UI for local
+- [`whishper`](https://github.com/pluja/whishper): full web UI for local
   transcription with translation and editing.
-- [`transcribe-anything`](https://github.com/zackees/transcribe-anything) —
+- [`transcribe-anything`](https://github.com/zackees/transcribe-anything):
   multi-backend, Mac-arm optimised, supports URLs.
-- [`WhisperX`](https://github.com/m-bain/whisperX) — word-level timestamps and
+- [`WhisperX`](https://github.com/m-bain/whisperX): word-level timestamps and
   diarisation on top of openai-whisper.
 
 ## Contributing
 
-Pull requests welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). By
+Pull requests welcome! See [CONTRIBUTING.md](CONTRIBUTING.md). By
 participating you agree to abide by our
 [Code of Conduct](CODE_OF_CONDUCT.md).
 

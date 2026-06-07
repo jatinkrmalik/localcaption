@@ -1,16 +1,16 @@
 %%{init: {'theme':'base', 'themeVariables': {
-  'primaryColor':'#EFF6FF',
-  'primaryBorderColor':'#3B82F6',
-  'primaryTextColor':'#1E3A8A',
-  'lineColor':'#1E3A8A',
+  'primaryColor':'#F8FAFC',
+  'primaryBorderColor':'#CBD5E1',
+  'primaryTextColor':'#0F172A',
+  'lineColor':'#475569',
   'fontFamily':'Inter, system-ui, sans-serif',
   'clusterBkg':'#F8FAFC',
-  'clusterBorder':'#94A3B8'
+  'clusterBorder':'#CBD5E1'
 }}}%%
 flowchart TB
     USER(["👤 user"]):::user
 
-    subgraph PKG["src/localcaption/  — Python package"]
+    subgraph PKG["src/localcaption/ · Python package"]
         direction TB
 
         subgraph ENTRY["entry points"]
@@ -21,21 +21,21 @@ flowchart TB
 
         PIPE["pipeline.py<br/><b>transcribe_url()</b><br/><i>public Python API</i>"]:::core
 
-        subgraph STAGES["pipeline stages — single responsibility"]
+        subgraph STAGES["pipeline stages · single responsibility"]
             direction LR
             DL["download.py<br/><i>yt-dlp Python API</i>"]:::stage
             AU["audio.py<br/><i>ffmpeg subprocess</i>"]:::stage
             WH["whisper.py<br/><i>whisper.cpp subprocess</i>"]:::stage
         end
 
-        subgraph SUPPORT["support modules — used by all stages"]
+        subgraph SUPPORT["support modules · used by all stages"]
             direction LR
             ERR["errors.py<br/>LocalCaptionError ▸ DependencyError ▸<br/>DownloadError ▸ AudioConversionError ▸<br/>TranscriptionError"]:::support
             LOG["_logging.py<br/><i>shared stdout logger</i>"]:::support
         end
     end
 
-    subgraph EXT["external dependencies — installed by scripts/setup.sh"]
+    subgraph EXT["external dependencies · installed by scripts/setup.sh"]
         direction LR
         YTDLP(["📦 yt-dlp<br/><i>pip dependency</i>"]):::extdep
         FFMPEG(["⚙️ ffmpeg<br/><i>system binary</i>"]):::extdep
@@ -43,7 +43,7 @@ flowchart TB
         MODEL[/"🧠 ggml model<br/><i>./whisper.cpp/models/</i>"/]:::model
     end
 
-    USER ==>|"localcaption &lt;url&gt;"| CLI
+    USER ==>|"localcaption <url>"| CLI
     USER ==>|"python -m localcaption"| MAIN
     MAIN --> CLI
     CLI ==>|"transcribe_url(...)"| PIPE

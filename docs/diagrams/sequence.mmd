@@ -1,9 +1,9 @@
 %%{init: {'theme':'base', 'themeVariables': {
-  'primaryColor':'#EFF6FF',
+  'primaryColor':'#F8FAFC',
   'actorBkg':'#DBEAFE',
   'actorBorder':'#2563EB',
   'actorTextColor':'#1E3A8A',
-  'signalColor':'#1E3A8A',
+  'signalColor':'#475569',
   'signalTextColor':'#0F172A',
   'noteBkgColor':'#FEF3C7',
   'noteTextColor':'#78350F',
@@ -26,7 +26,7 @@ sequenceDiagram
     CLI->>Pipe: transcribe_url(url, out_dir, whisper_dir, model)
 
     rect rgb(220, 252, 231)
-    note right of Pipe: Stage 1 — download
+    note right of Pipe: Stage 1 · Download
     Pipe->>Download: download_audio(url, work_dir)
     Download->>YT: YoutubeDL(opts).extract_info(url, download=True)
     note over YT: player_client = [android, ios, web]<br/>retries = 5
@@ -36,7 +36,7 @@ sequenceDiagram
     end
 
     rect rgb(219, 234, 254)
-    note right of Pipe: Stage 2 — re-encode
+    note right of Pipe: Stage 2 · Re-encode
     Pipe->>Audio: to_whisper_wav(audio, wav_path)
     Audio->>FF: subprocess(ffmpeg -ac 1 -ar 16000 -c:a pcm_s16le)
     FF-->>Audio: 16 kHz mono WAV
@@ -44,7 +44,7 @@ sequenceDiagram
     end
 
     rect rgb(252, 231, 243)
-    note right of Pipe: Stage 3 — transcribe
+    note right of Pipe: Stage 3 · Transcribe
     Pipe->>Whisper: transcribe(wav, model, out_base, whisper_dir)
     Whisper->>Whisper: WhisperPaths.find_binary()
     Whisper->>WCPP: subprocess(whisper-cli -m model -f wav -otxt -osrt -ovtt -oj)
