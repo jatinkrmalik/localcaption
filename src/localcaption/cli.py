@@ -4,8 +4,8 @@ Exposed as the ``localcaption`` console script via ``pyproject.toml``.
 
 Two invocation styles are supported:
 
-    localcaption <url> [options]      # one-shot transcription (default)
-    localcaption doctor               # diagnose your install
+    localcaption <url-or-file> [options]   # one-shot transcription (default)
+    localcaption doctor                    # diagnose your install
 """
 
 from __future__ import annotations
@@ -69,9 +69,12 @@ def _default_whisper_dir() -> Path:
 def _build_transcribe_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="localcaption",
-        description="Fully-local YouTube → transcript using yt-dlp + ffmpeg + whisper.cpp.",
+        description="Fully-local video → transcript using yt-dlp + ffmpeg + whisper.cpp.",
     )
-    parser.add_argument("url", help="YouTube URL (or any URL yt-dlp supports)")
+    parser.add_argument(
+        "url",
+        help="YouTube URL, any URL yt-dlp supports, or path to a local video/audio file",
+    )
     parser.add_argument(
         "-m", "--model", default=DEFAULT_MODEL,
         help=f"whisper model name (default: {DEFAULT_MODEL})",
@@ -400,7 +403,7 @@ def _cmd_doctor(argv: list[str]) -> int:
     all_ok, fix_hints, gaps = _run_doctor_diagnostics(whisper_dir)
 
     if all_ok:
-        print("\nAll checks passed. You're good to go: localcaption <url>")
+        print("\nAll checks passed. You're good to go: localcaption <url-or-file>")
         return 0
 
     if not args.fix:
@@ -422,7 +425,7 @@ def _cmd_doctor(argv: list[str]) -> int:
     print("Re-running diagnostics to verify…\n")
     all_ok_after, _, _ = _run_doctor_diagnostics(whisper_dir)
     if all_ok_after:
-        print("\nAll checks passed. You're good to go: localcaption <url>")
+        print("\nAll checks passed. You're good to go: localcaption <url-or-file>")
         return 0
     print("\nSome checks still failing — see output above.")
     return 1
@@ -579,7 +582,7 @@ def _cmd_model_download(argv: list[str]) -> int:
         return 130
 
     print(f"✅ Done. {path}")
-    print(f"   Use it with: localcaption --model {spec.name} <url>")
+    print(f"   Use it with: localcaption --model {spec.name} <url-or-file>")
     return 0
 
 
@@ -628,7 +631,7 @@ def _cmd_model_rm(argv: list[str]) -> int:
 
 def _print_top_level_help() -> None:
     print("""\
-usage: localcaption <url> [options]            transcribe a video (default)
+usage: localcaption <url-or-file> [options]    transcribe a video (default)
        localcaption doctor                     diagnose your install
        localcaption model <subcommand>         list / download / remove models
        localcaption --help                     show transcribe help
