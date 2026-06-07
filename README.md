@@ -284,7 +284,7 @@ the subprocess hops to yt-dlp, ffmpeg, and whisper.cpp. The intermediate
 > files alongside the rendered PNGs. Regenerate with:
 > ```bash
 > mmdc -i docs/diagrams/<name>.mmd -o docs/diagrams/<name>.png \
->   -t default -b transparent --width 1600 --scale 2
+>   -t default -b white --width 1600 --scale 2
 > ```
 
 ## Benchmarks
