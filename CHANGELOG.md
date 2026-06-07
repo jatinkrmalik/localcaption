@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-06
+
 ### Added
 - **`localcaption model` subcommand family** for first-class whisper model
   management. No more shelling into `download-ggml-model.sh`. Subcommands:
