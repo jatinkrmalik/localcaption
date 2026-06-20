@@ -67,10 +67,9 @@ def transcribe_url(
     audio_path: Path | None = None
     wav_path: Path | None = None
     try:
-        if _is_local_file(url):
-            audio_path = Path(url).resolve()
-        else:
-            audio_path = download_audio(url, work_dir)
+        audio_path = (
+            Path(url).resolve() if _is_local_file(url) else download_audio(url, work_dir)
+        )
         wav_path = work_dir / f"{audio_path.stem}.16k.wav"
         to_whisper_wav(audio_path, wav_path)
 
