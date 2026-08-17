@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-16
+
+### Added
+- **Local video and audio files.** `localcaption /path/to/video.mp4` (or a
+  wav / mp3 / mkv / similar) runs the same ffmpeg + whisper.cpp path
+  without calling yt-dlp. Output names come from the input filename.
+
+### Changed
+- CLI help, `doctor`, and the README now say `<url-or-file>` instead of
+  treating this as URL-only.
+
+### Fixed
+- Architecture, pipeline, and sequence diagrams render with a white
+  background so they stay readable on GitHub dark mode.
+
 ## [0.2.0] - 2026-06-06
 
 ### Added
