@@ -164,6 +164,10 @@ localcaption "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 # Vimeo, Twitch, Twitter/X, and 1000+ other sites work too
 localcaption "https://vimeo.com/148751763"
+
+# Local video/audio files
+localcaption /path/to/video.mp4
+localcaption ./recording.wav
 ```
 
 | flag | default | what it does |
@@ -181,15 +185,15 @@ localcaption "https://vimeo.com/148751763"
    3. `./whisper.cpp` (dev checkout).
    4. `~/.local/share/localcaption/whisper.cpp` (where `install.sh` puts it).
 
-Outputs `<videoId>.txt`, `.srt`, `.vtt`, and `.json` in the chosen directory.
+Outputs `<videoId>.txt`, `.srt`, `.vtt`, and `.json` in the chosen directory. For local files, the output filename is derived from the input file's name.
 
-You can also invoke it as a module: `python -m localcaption <url>`.
+You can also invoke it as a module: `python -m localcaption <url-or-file>`.
 
 ### Subcommands
 
 | Subcommand | What it does |
 |---|---|
-| _(default)_ `localcaption <url>` | Transcribe a single URL. |
+| _(default)_ `localcaption <url-or-file>` | Transcribe a URL or local video/audio file. |
 | `localcaption doctor` | Read-only diagnostic: prereqs, whisper.cpp, available models. Useful before filing a bug. |
 | `localcaption doctor --fix` | Self-heal: install missing system deps, clone+build whisper.cpp, download the default model, then re-verify. Idempotent. |
 | `localcaption model list` | List every supported whisper model with size + install status. |
