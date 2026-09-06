@@ -45,6 +45,13 @@ def test_default_model_is_small_en() -> None:
     assert DEFAULT_MODEL == "small.en"
 
 
+def test_setup_and_install_scripts_default_to_small_en() -> None:
+    root = Path(__file__).resolve().parents[1]
+    for rel in ("scripts/setup.sh", "scripts/install.sh"):
+        text = (root / rel).read_text(encoding="utf-8")
+        assert "${WHISPER_MODEL:-small.en}" in text, rel
+
+
 def test_model_file_path(tmp_path: Path) -> None:
     paths = WhisperPaths(tmp_path)
     assert paths.model_file("base.en") == tmp_path / "models" / "ggml-base.en.bin"

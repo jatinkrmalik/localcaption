@@ -36,6 +36,7 @@ def test_doctor_runs_without_install(capsys, tmp_path: Path) -> None:
     assert "whisper.cpp" in out
     # Missing whisper.cpp directory → non-zero exit
     assert rc == 1
+    assert "small.en" in out
 
 
 def test_doctor_recognises_built_install(capsys, tmp_path: Path) -> None:
@@ -81,6 +82,7 @@ def test_unknown_subcommand_treated_as_url(monkeypatch) -> None:
 
     def fake(url, **kw):
         sentinel["url"] = url
+        sentinel["model"] = kw.get("model")
         raise SystemExit(0)
 
     monkeypatch.setattr("localcaption.cli.transcribe_url", fake)
@@ -88,6 +90,7 @@ def test_unknown_subcommand_treated_as_url(monkeypatch) -> None:
     with pytest.raises(SystemExit):
         main(["https://example.com/video"])
     assert sentinel["url"] == "https://example.com/video"
+    assert sentinel["model"] == "small.en"
 
 
 # --- doctor --fix --------------------------------------------------------
@@ -153,6 +156,34 @@ def test_doctor_fix_invokes_installer_for_missing_whisper(
     del rc
 
 
+def test_doctor_fix_defaults_to_small_en(monkeypatch, tmp_path: Path) -> None:
+    """`doctor --fix` with no --model must download the install default."""
+    whisper_dir = tmp_path / "whisper.cpp"
+    calls: dict[str, object] = {}
+
+    def fake_ensure(path):
+        bin_path = path / "build" / "bin" / "whisper-cli"
+        bin_path.parent.mkdir(parents=True, exist_ok=True)
+        bin_path.write_text("#!/bin/sh\nexit 0\n")
+        bin_path.chmod(0o755)
+        (path / "models").mkdir(exist_ok=True)
+        return bin_path
+
+    def fake_download(name, whisper_root, **_kw):
+        calls["model_name"] = name
+        target = whisper_root / "models" / f"ggml-{name}.bin"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"\x00" * 32)
+        return target
+
+    monkeypatch.setattr("localcaption.installer.ensure_whisper_cpp", fake_ensure)
+    monkeypatch.setattr("localcaption.installer.install_system_dep", lambda _name: None)
+    monkeypatch.setattr("localcaption.models.download_model", fake_download)
+
+    main(["doctor", "--fix", "--whisper-dir", str(whisper_dir)])
+    assert calls["model_name"] == "small.en"
+
+
 def test_doctor_fix_aborts_when_install_step_fails(
     monkeypatch, tmp_path: Path, capsys
 ) -> None:
@@ -185,3 +216,4 @@ def test_doctor_help_advertises_fix_flag(capsys) -> None:
         main(["doctor", "--help"])
     out = capsys.readouterr().out
     assert "--fix" in out
+    assert "default: small.en" in out

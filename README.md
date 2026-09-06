@@ -203,10 +203,10 @@ You can also invoke it as a module: `python -m localcaption <url-or-file>`.
 
 ### Managing models
 
-`localcaption` ships with a default `small.en` model (~466 MB). For a
-faster run use `--model tiny.en`; for non-English audio, pick a
-multilingual model. If the model isn't already installed, you'll be
-prompted to download it:
+`localcaption` defaults to `small.en` (~466 MB), downloaded by
+`doctor --fix` or on first use. For a faster run use `--model tiny.en`;
+for non-English audio, pick a multilingual model. If the model isn't
+already installed, you'll be prompted to download it:
 
 ```bash
 $ localcaption --model small.en "https://www.youtube.com/watch?v=..."
@@ -312,15 +312,16 @@ competitive benchmark.
 
 ```bash
 # Apple Silicon, macOS, whisper.cpp built with Metal,
-# model: ggml-small.en (default), language: auto, no other heavy processes.
+# model: ggml-base.en (matches the table above; not the current default),
+# language: auto, no other heavy processes.
 
-time localcaption --no-print -o /tmp/lc-bench-1 \
+time localcaption --model base.en --no-print -o /tmp/lc-bench-1 \
   "https://www.youtube.com/watch?v=PSRJfaAYkW4"
 
-time localcaption --no-print -o /tmp/lc-bench-2 \
+time localcaption --model base.en --no-print -o /tmp/lc-bench-2 \
   "https://www.youtube.com/watch?v=aircAruvnKk"
 
-time localcaption --no-print -o /tmp/lc-bench-3 \
+time localcaption --model base.en --no-print -o /tmp/lc-bench-3 \
   "https://www.youtube.com/watch?v=BYizgB2FcAQ"
 ```
 
@@ -359,7 +360,7 @@ criteria, and discussion):
 | [#4](https://github.com/jatinkrmalik/localcaption/issues/4) | Speaker diarization with pyannote.audio (`--diarize`) | `stretch`, `help wanted` |
 | [#5](https://github.com/jatinkrmalik/localcaption/issues/5) | YouTube chapters & grep-able search index | `enhancement` |
 | [#6](https://github.com/jatinkrmalik/localcaption/issues/6) | Pluggable transcription backends (faster-whisper / MLX) | `help wanted` |
-| [#1](https://github.com/jatinkrmalik/localcaption/issues/1) | Switch default model from `base.en` to `small.en` | `enhancement` |
+| [#1](https://github.com/jatinkrmalik/localcaption/issues/1) | Switch default model from `base.en` to `small.en` | _unreleased_ ✅ |
 
 **Have an idea?** Open a
 [feature request](https://github.com/jatinkrmalik/localcaption/issues/new/choose),
