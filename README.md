@@ -1,28 +1,38 @@
+<div align="center">
+
 # localcaption
 
 Offline Whisper transcription for YouTube and local files. Writes SRT, VTT, and JSON. No API key.
 
 > Local, offline Whisper transcription for YouTube, Vimeo, Twitch, Twitter/X, and [1000+ other sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) via yt-dlp, plus any video or audio file on disk. Paste a URL or a path; get `.txt`, `.srt`, `.vtt`, and `.json` without an API key and without uploading audio to the cloud. Default engine is [whisper.cpp](https://github.com/ggerganov/whisper.cpp); [faster-whisper](https://github.com/SYSTRAN/faster-whisper) is optional.
 
-<!-- Package: where to get it, what versions, what license -->
-[![PyPI version](https://img.shields.io/pypi/v/localcaption?logo=pypi&logoColor=white&color=%233775A9&cacheSeconds=300)](https://pypi.org/project/localcaption/)
-[![Python versions](https://img.shields.io/pypi/pyversions/localcaption?logo=python&logoColor=white&cacheSeconds=300)](https://pypi.org/project/localcaption/)
-[![License: MIT](https://img.shields.io/github/license/jatinkrmalik/localcaption?color=yellow)](LICENSE)
+<!-- Package -->
+<p>
+  <a href="https://pypi.org/project/localcaption/"><img src="https://img.shields.io/pypi/v/localcaption?logo=pypi&logoColor=white&color=%233775A9&cacheSeconds=300" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/localcaption/"><img src="https://img.shields.io/pypi/pyversions/localcaption?logo=python&logoColor=white&cacheSeconds=300" alt="Python versions"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/jatinkrmalik/localcaption?color=yellow" alt="License: MIT"></a>
+</p>
 
-<!-- Build & quality: is the code actually working -->
-[![CI](https://github.com/jatinkrmalik/localcaption/actions/workflows/ci.yml/badge.svg)](https://github.com/jatinkrmalik/localcaption/actions/workflows/ci.yml)
-[![Release](https://github.com/jatinkrmalik/localcaption/actions/workflows/release.yml/badge.svg)](https://github.com/jatinkrmalik/localcaption/actions/workflows/release.yml)
-[![Hatch project](https://img.shields.io/badge/%F0%9F%A5%9A-Hatch-4051b5.svg)](https://github.com/pypa/hatch)
+<!-- Build -->
+<p>
+  <a href="https://github.com/jatinkrmalik/localcaption/actions/workflows/ci.yml"><img src="https://github.com/jatinkrmalik/localcaption/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/jatinkrmalik/localcaption/actions/workflows/release.yml"><img src="https://github.com/jatinkrmalik/localcaption/actions/workflows/release.yml/badge.svg" alt="Release"></a>
+  <a href="https://github.com/pypa/hatch"><img src="https://img.shields.io/badge/%F0%9F%A5%9A-Hatch-4051b5.svg" alt="Hatch project"></a>
+</p>
 
-<!-- Activity & community: is anyone maintaining and using this -->
-[![GitHub stars](https://img.shields.io/github/stars/jatinkrmalik/localcaption?style=flat&logo=github)](https://github.com/jatinkrmalik/localcaption/stargazers)
-[![Last commit](https://img.shields.io/github/last-commit/jatinkrmalik/localcaption?logo=github)](https://github.com/jatinkrmalik/localcaption/commits/main)
-[![Open issues](https://img.shields.io/github/issues/jatinkrmalik/localcaption?logo=github)](https://github.com/jatinkrmalik/localcaption/issues)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+<!-- Community -->
+<p>
+  <a href="https://github.com/jatinkrmalik/localcaption/stargazers"><img src="https://img.shields.io/github/stars/jatinkrmalik/localcaption?style=flat&logo=github" alt="GitHub stars"></a>
+  <a href="https://github.com/jatinkrmalik/localcaption/commits/main"><img src="https://img.shields.io/github/last-commit/jatinkrmalik/localcaption?logo=github" alt="Last commit"></a>
+  <a href="https://github.com/jatinkrmalik/localcaption/issues"><img src="https://img.shields.io/github/issues/jatinkrmalik/localcaption?logo=github" alt="Open issues"></a>
+  <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome"></a>
+</p>
 
 ```bash
 pipx install localcaption && localcaption doctor --fix
 ```
+
+</div>
 
 `localcaption` is a tiny orchestrator over three battle-tested tools:
 
