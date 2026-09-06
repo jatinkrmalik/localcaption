@@ -1,10 +1,10 @@
 <div align="center">
 
-# <img src="docs/icons/localcaption.svg" alt="localcaption" width="56" height="56" /> localcaption
+<img src="docs/icons/localcaption.svg" alt="localcaption" width="56" height="56" /> 
+
+# localcaption
 
 Offline Whisper transcription for YouTube and local files. Writes SRT, VTT, and JSON. No API key.
-
-> Local, offline Whisper transcription for YouTube, Vimeo, Twitch, Twitter/X, and [1000+ other sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) via yt-dlp, plus any video or audio file on disk. Paste a URL or a path; get `.txt`, `.srt`, `.vtt`, and `.json` without an API key and without uploading audio to the cloud. Default engine is [whisper.cpp](https://github.com/ggerganov/whisper.cpp); [faster-whisper](https://github.com/SYSTRAN/faster-whisper) is optional.
 
 <!-- Package -->
 <p>
@@ -29,10 +29,13 @@ Offline Whisper transcription for YouTube and local files. Writes SRT, VTT, and 
 </p>
 
 ```bash
-pipx install localcaption && localcaption doctor --fix
+pipx install localcaption && localcaption doctor --fix # to get started
 ```
 
 </div>
+
+> [!TIP]
+> Local, offline Whisper transcription for YouTube, Vimeo, Twitch, Twitter/X, and [1000+ other sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) via yt-dlp, plus any video or audio file on disk. Paste a URL or a path; get `.txt`, `.srt`, `.vtt`, and `.json` without an API key and without uploading audio to the cloud. Default engine is [whisper.cpp](https://github.com/ggerganov/whisper.cpp); [faster-whisper](https://github.com/SYSTRAN/faster-whisper) is optional.
 
 `localcaption` is a tiny orchestrator over three battle-tested tools:
 
