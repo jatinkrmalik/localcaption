@@ -10,7 +10,7 @@ import pytest
 
 from localcaption.download import DownloadResult
 from localcaption.pipeline import PipelineResult, _is_local_file, transcribe_url
-from localcaption.whisper import TranscriptionResult
+from localcaption.whisper import TranscriptionResult, output_file
 
 
 @pytest.fixture(autouse=True)
@@ -369,9 +369,9 @@ INFO_WITH_CHAPTERS = {
 
 
 def _write_whisper_outputs(out_base: Path) -> TranscriptionResult:
-    txt = out_base.with_suffix(".txt")
+    txt = output_file(out_base, ".txt")
     txt.write_text("Welcome to the show\nFirst, let's install\nNow the demo begins\n")
-    json_path = out_base.with_suffix(".json")
+    json_path = output_file(out_base, ".json")
     json_path.write_text(
         json.dumps(
             {
@@ -391,8 +391,8 @@ def _write_whisper_outputs(out_base: Path) -> TranscriptionResult:
     )
     return TranscriptionResult(
         txt=txt,
-        srt=out_base.with_suffix(".srt"),
-        vtt=out_base.with_suffix(".vtt"),
+        srt=output_file(out_base, ".srt"),
+        vtt=output_file(out_base, ".vtt"),
         json=json_path,
     )
 
@@ -519,3 +519,118 @@ class TestChaptersAndIndex:
         assert row["url"] == "https://www.youtube.com/watch?v=vid123"
         assert [c["title"] for c in row["chapters"]] == ["Intro", "Setup", "Demo"]
         assert row["transcript"].endswith("vid123.txt")
+
+    def test_dotted_id_keeps_full_stem(self, monkeypatch, tmp_path: Path) -> None:
+        out_dir = tmp_path / "out"
+        whisper_dir = tmp_path / "whisper.cpp"
+        info = {
+            **INFO_WITH_CHAPTERS,
+            "id": "ep.12",
+            "webpage_url": "https://example.com/ep.12",
+        }
+
+        def fake_download(url, work_dir):
+            downloaded = work_dir / "ep.12.m4a"
+            downloaded.write_text("fake audio")
+            return DownloadResult(path=downloaded, info=info)
+
+        def fake_to_whisper_wav(src, dst):
+            dst.write_text("fake wav")
+            return dst
+
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+            return _write_whisper_outputs(out_base)
+
+        monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
+        monkeypatch.setattr("localcaption.pipeline.to_whisper_wav", fake_to_whisper_wav)
+        monkeypatch.setattr("localcaption.pipeline.transcribe", fake_transcribe)
+
+        result = transcribe_url(
+            "https://example.com/ep.12",
+            out_dir=out_dir,
+            whisper_dir=whisper_dir,
+            model="base.en",
+        )
+
+        assert result.chapters_json == out_dir / "ep.12.chapters.json"
+        assert result.chapters_json.is_file()
+        assert result.chaptered_md == out_dir / "ep.12.chaptered.md"
+        md = result.chaptered_md.read_text()
+        assert "## 00:00 Intro" in md
+        assert "Welcome to the show" in md.split("## 02:30 Setup")[0]
+        assert "First, let's install" in md.split("## 02:30 Setup")[1]
+        assert not (out_dir / "ep.chapters.json").exists()
+
+        index_path = tmp_path / "index.jsonl"
+        row = json.loads(index_path.read_text().splitlines()[0])
+        assert row["id"] == "ep.12"
+        assert row["transcript"].endswith("ep.12.txt")
+
+    def test_local_dotted_filename_index_path(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        video = tmp_path / "talk.final.mp4"
+        video.write_text("fake video")
+        out_dir = tmp_path / "out"
+        whisper_dir = tmp_path / "whisper.cpp"
+
+        def fake_to_whisper_wav(src, dst):
+            dst.write_text("fake wav")
+            return dst
+
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+            return _write_whisper_outputs(out_base)
+
+        monkeypatch.setattr("localcaption.pipeline.to_whisper_wav", fake_to_whisper_wav)
+        monkeypatch.setattr("localcaption.pipeline.transcribe", fake_transcribe)
+
+        transcribe_url(
+            str(video),
+            out_dir=out_dir,
+            whisper_dir=whisper_dir,
+            model="base.en",
+        )
+
+        index_path = tmp_path / "index.jsonl"
+        row = json.loads(index_path.read_text().splitlines()[0])
+        assert row["id"] == "talk.final"
+        assert row["transcript"].endswith("talk.final.txt")
+        assert (out_dir / "talk.final.txt").is_file()
+
+    def test_corrupt_index_does_not_fail_run(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        out_dir = tmp_path / "out"
+        whisper_dir = tmp_path / "whisper.cpp"
+        index_path = tmp_path / "index.jsonl"
+        index_path.write_text("[1, 2, 3]\nnot json\n")
+
+        def fake_download(url, work_dir):
+            downloaded = work_dir / "plain.m4a"
+            downloaded.write_text("fake audio")
+            return DownloadResult(
+                path=downloaded,
+                info={"id": "plain", "title": "No chapters", "chapters": None},
+            )
+
+        def fake_to_whisper_wav(src, dst):
+            dst.write_text("fake wav")
+            return dst
+
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+            return _write_whisper_outputs(out_base)
+
+        monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
+        monkeypatch.setattr("localcaption.pipeline.to_whisper_wav", fake_to_whisper_wav)
+        monkeypatch.setattr("localcaption.pipeline.transcribe", fake_transcribe)
+
+        result = transcribe_url(
+            "https://example.com/plain",
+            out_dir=out_dir,
+            whisper_dir=whisper_dir,
+            model="base.en",
+        )
+        assert result.transcripts.txt.is_file()
+        rows = [json.loads(line) for line in index_path.read_text().splitlines() if line]
+        assert len(rows) == 1
+        assert rows[0]["id"] == "plain"

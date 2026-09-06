@@ -30,13 +30,15 @@ def upsert_index(entry: dict[str, Any], path: Path | None = None) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     rows: list[dict[str, Any]] = []
     if path.is_file():
-        for line in path.read_text(encoding="utf-8").splitlines():
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
             line = line.strip()
             if not line:
                 continue
             try:
                 obj = json.loads(line)
             except json.JSONDecodeError:
+                continue
+            if not isinstance(obj, dict):
                 continue
             if obj.get("id") != entry.get("id"):
                 rows.append(obj)
@@ -55,14 +57,16 @@ def load_index(path: Path | None = None) -> list[dict[str, Any]]:
     if not path.is_file():
         return []
     rows: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         line = line.strip()
         if not line:
             continue
         try:
-            rows.append(json.loads(line))
+            obj = json.loads(line)
         except json.JSONDecodeError:
             continue
+        if isinstance(obj, dict):
+            rows.append(obj)
     return rows
 
 
@@ -152,14 +156,17 @@ def _entry_segments(transcript: str) -> list[Segment]:
     if not transcript:
         return []
     path = Path(transcript)
-    segs = load_segments(path)
-    if segs:
-        return segs
-    if not path.is_file():
+    try:
+        segs = load_segments(path)
+        if segs:
+            return segs
+        if not path.is_file():
+            return []
+        # Untimed fallback: one synthetic segment per non-empty line.
+        return [
+            Segment(start=-1.0, end=-1.0, text=line)
+            for line in path.read_text(encoding="utf-8", errors="replace").splitlines()
+            if line.strip()
+        ]
+    except OSError:
         return []
-    # Untimed fallback: one synthetic segment per non-empty line.
-    return [
-        Segment(start=-1.0, end=-1.0, text=line)
-        for line in path.read_text(encoding="utf-8", errors="replace").splitlines()
-        if line.strip()
-    ]

@@ -106,6 +106,53 @@ def test_load_segments_from_whisper_json(tmp_path: Path) -> None:
     assert segs[1].start == 2.0
 
 
+def test_chapters_from_info_skips_bad_start() -> None:
+    chapters = chapters_from_info(
+        {
+            "chapters": [
+                {"title": "Bad", "start_time": "nope"},
+                {"title": "Good", "start_time": 12},
+            ]
+        }
+    )
+    assert [c.title for c in chapters] == ["Good"]
+    assert chapters[0].start_time == 12
+
+
+def test_load_segments_keeps_dotted_stem(tmp_path: Path) -> None:
+    json_path = tmp_path / "ep.12.json"
+    json_path.write_text(
+        json.dumps(
+            {
+                "transcription": [
+                    {"offsets": {"from": 1500, "to": 2000}, "text": "hello"},
+                ]
+            }
+        )
+    )
+    from_txt = load_segments(tmp_path / "ep.12.txt")
+    from_base = load_segments(tmp_path / "ep.12")
+    assert [s.text for s in from_txt] == ["hello"]
+    assert from_txt[0].start == 1.5
+    assert [s.text for s in from_base] == ["hello"]
+
+
+def test_load_segments_skips_bad_offsets(tmp_path: Path) -> None:
+    json_path = tmp_path / "vid.json"
+    json_path.write_text(
+        json.dumps(
+            {
+                "transcription": [
+                    {"offsets": {"from": "nope"}, "text": "skip me"},
+                    {"offsets": {"from": 1000, "to": 2000}, "text": "keep me"},
+                ]
+            }
+        )
+    )
+    segs = load_segments(tmp_path / "vid.txt")
+    assert [s.text for s in segs] == ["keep me"]
+
+
 def test_load_segments_from_srt_fallback(tmp_path: Path) -> None:
     (tmp_path / "vid.srt").write_text(
         "1\n00:00:00,000 --> 00:00:01,500\nHello\n\n"

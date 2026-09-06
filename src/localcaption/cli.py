@@ -717,7 +717,11 @@ def _cmd_search(argv: list[str]) -> int:
     from .index import default_index_path, search_index
 
     term = " ".join(args.term)
-    hits = search_index(term)
+    try:
+        hits = search_index(term)
+    except OSError as exc:
+        log.error(f"could not read search index: {exc}")
+        return 1
     if not hits:
         print(f"No matches for {term!r} in {default_index_path()}")
         return 1

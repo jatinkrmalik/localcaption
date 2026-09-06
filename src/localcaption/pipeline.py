@@ -26,7 +26,7 @@ from .download import download_audio
 from .index import upsert_index
 from .summary import DEFAULT_MODEL as DEFAULT_SUMMARY_MODEL
 from .summary import write_summary
-from .whisper import DEFAULT_MODEL, TranscriptionResult, transcribe
+from .whisper import DEFAULT_MODEL, TranscriptionResult, output_file, transcribe
 
 
 @dataclass(frozen=True)
@@ -125,9 +125,12 @@ def transcribe_url(
 
         chapters = chapters_from_info(info)
         if chapters:
-            chapters_json, chaptered_md = _write_chapter_artefacts(
-                out_base, chapters, transcripts
-            )
+            try:
+                chapters_json, chaptered_md = _write_chapter_artefacts(
+                    out_base, chapters, transcripts
+                )
+            except OSError as exc:
+                log.warn(f"could not write chapter files: {exc}")
 
         index_entry = _index_entry(url, audio_path, info, chapters, transcripts)
     finally:
@@ -139,7 +142,8 @@ def transcribe_url(
     if index_entry is not None:
         try:
             upsert_index(index_entry)
-        except OSError as exc:
+        except Exception as exc:
+            # Index is best-effort: a corrupt jsonl row must not fail a finished run.
             log.warn(f"could not update search index: {exc}")
 
     summary_path: Path | None = None
@@ -179,12 +183,12 @@ def _write_chapter_artefacts(
     chapters: list[Chapter],
     transcripts: TranscriptionResult,
 ) -> tuple[Path, Path]:
-    chapters_json = write_chapters_json(out_base.with_suffix(".chapters.json"), chapters)
+    chapters_json = write_chapters_json(output_file(out_base, ".chapters.json"), chapters)
     fallback = ""
     if transcripts.txt.exists():
         fallback = transcripts.txt.read_text(encoding="utf-8", errors="replace")
     chaptered_md = write_chaptered_md(
-        out_base.with_suffix(".chaptered.md"),
+        output_file(out_base, ".chaptered.md"),
         chapters,
         load_segments(out_base),
         fallback_text=fallback,

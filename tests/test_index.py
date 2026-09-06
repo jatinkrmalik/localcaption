@@ -115,6 +115,64 @@ def test_search_no_index(tmp_path: Path) -> None:
     assert search_index("anything", tmp_path / "missing.jsonl") == []
 
 
+def test_upsert_skips_non_dict_rows(tmp_path: Path) -> None:
+    path = tmp_path / "index.jsonl"
+    path.write_text('[1, 2, 3]\n"just a string"\n{"id": "keep", "title": "ok"}\n')
+    upsert_index({"id": "new", "title": "added", "transcript": ""}, path)
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    assert [r["id"] for r in rows] == ["keep", "new"]
+
+
+def test_search_skips_non_dict_rows(tmp_path: Path) -> None:
+    path = tmp_path / "index.jsonl"
+    txt = tmp_path / "vid.txt"
+    txt.write_text("hello world\n")
+    path.write_text(
+        "[1, 2, 3]\n"
+        + json.dumps({"id": "vid", "title": "A talk", "transcript": str(txt)})
+        + "\n"
+    )
+    hits = search_index("hello", path)
+    assert len(hits) == 1
+    assert hits[0].id == "vid"
+
+
+def test_search_dotted_transcript_uses_sibling_json(tmp_path: Path) -> None:
+    path = tmp_path / "index.jsonl"
+    txt = tmp_path / "talk.final.txt"
+    txt.write_text("First, let's install\n")
+    (tmp_path / "talk.final.json").write_text(
+        json.dumps(
+            {
+                "transcription": [
+                    {
+                        "offsets": {"from": 150_000, "to": 155_000},
+                        "text": "First, let's install",
+                    }
+                ]
+            }
+        )
+    )
+    upsert_index(
+        {"id": "talk.final", "title": "A talk", "transcript": str(txt)},
+        path,
+    )
+    hits = search_index("install", path)
+    assert len(hits) == 1
+    assert hits[0].start == 150.0
+
+
+def test_search_txt_only_fallback(tmp_path: Path) -> None:
+    path = tmp_path / "index.jsonl"
+    txt = tmp_path / "vid.txt"
+    txt.write_text("no timestamps here but we mention ffmpeg\n")
+    upsert_index({"id": "vid", "title": "A talk", "transcript": str(txt)}, path)
+    hits = search_index("ffmpeg", path)
+    assert len(hits) == 1
+    assert hits[0].start is None
+    assert "ffmpeg" in hits[0].text
+
+
 def test_search_chapter_title_hit(tmp_path: Path) -> None:
     path = tmp_path / "index.jsonl"
     txt = tmp_path / "vid.txt"

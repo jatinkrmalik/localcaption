@@ -237,9 +237,10 @@ The transcript files are unchanged.
 
 ### Search past transcripts
 
-Each successful transcription appends one JSON line to
+Each successful transcription upserts one JSON line in
 `~/.local/share/localcaption/index.jsonl` (`id`, `url`, `title`, `duration`,
-`chapters`, `transcript`). Override the path with `LOCALCAPTION_INDEX_PATH`.
+`chapters`, `transcript`). Re-running the same id replaces that row. Override
+the path with `LOCALCAPTION_INDEX_PATH`.
 
 ```bash
 localcaption search "install"

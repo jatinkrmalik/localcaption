@@ -12,6 +12,17 @@ _SRT_TS = re.compile(
     r"(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})"
 )
 
+# Longer suffixes first so ".chaptered.md" is not treated as ".md".
+_KNOWN_SUFFIXES = (
+    ".chapters.json",
+    ".chaptered.md",
+    ".txt",
+    ".json",
+    ".srt",
+    ".vtt",
+    ".md",
+)
+
 
 @dataclass(frozen=True)
 class Chapter:
@@ -39,15 +50,17 @@ def chapters_from_info(info: dict[str, Any] | None) -> list[Chapter]:
         start = ch.get("start_time")
         if start is None:
             continue
-        title = str(ch.get("title") or f"Chapter {i + 1}").strip()
+        try:
+            start_f = float(start)
+        except (TypeError, ValueError):
+            continue
+        title = str(ch.get("title") or "").strip() or f"Chapter {i + 1}"
         end = ch.get("end_time")
-        out.append(
-            Chapter(
-                title=title,
-                start_time=float(start),
-                end_time=None if end is None else float(end),
-            )
-        )
+        try:
+            end_f = None if end is None else float(end)
+        except (TypeError, ValueError):
+            end_f = None
+        out.append(Chapter(title=title, start_time=start_f, end_time=end_f))
     filled: list[Chapter] = []
     for i, ch in enumerate(out):
         end = ch.end_time
@@ -84,15 +97,18 @@ def write_chapters_json(path: Path, chapters: list[Chapter]) -> Path:
 
 def load_segments(transcript_path: Path) -> list[Segment]:
     """Load timed segments from sibling whisper ``.json``, else ``.srt``."""
-    base = transcript_path if transcript_path.suffix == "" else transcript_path.with_suffix("")
-    json_path = base.with_suffix(".json")
-    if json_path.is_file():
-        segs = _segments_from_whisper_json(json_path)
-        if segs:
-            return segs
-    srt_path = base.with_suffix(".srt")
-    if srt_path.is_file():
-        return _segments_from_srt(srt_path)
+    base = _without_known_suffix(transcript_path)
+    json_path = base.parent / f"{base.name}.json"
+    srt_path = base.parent / f"{base.name}.srt"
+    try:
+        if json_path.is_file():
+            segs = _segments_from_whisper_json(json_path)
+            if segs:
+                return segs
+        if srt_path.is_file():
+            return _segments_from_srt(srt_path)
+    except OSError:
+        return []
     return []
 
 
@@ -160,7 +176,10 @@ def _segments_from_whisper_json(path: Path) -> list[Segment]:
         text = str(item.get("text") or "").strip()
         if not text:
             continue
-        start, end = _segment_times(item)
+        try:
+            start, end = _segment_times(item)
+        except (TypeError, ValueError):
+            continue
         segs.append(Segment(start=start, end=end, text=text))
     return segs
 
@@ -192,6 +211,16 @@ def _parse_clock(value: str) -> float:
         return float(value)
     except ValueError:
         return 0.0
+
+
+def _without_known_suffix(path: Path) -> Path:
+    """Strip a transcript suffix, keeping extra dots in the stem."""
+    name = path.name
+    lower = name.lower()
+    for suffix in _KNOWN_SUFFIXES:
+        if lower.endswith(suffix):
+            return path.parent / name[: -len(suffix)]
+    return path
 
 
 def _segments_from_srt(path: Path) -> list[Segment]:
