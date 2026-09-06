@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,99 @@ class TestCliHelpText:
         assert rc == 2
         out = capsys.readouterr().out
         assert "url-or-file" in out
+
+
+class TestCliBackendFlag:
+    def test_help_mentions_backend(self, capsys) -> None:
+        with pytest.raises(SystemExit) as excinfo:
+            main(["--help"])
+        assert excinfo.value.code == 0
+        out = capsys.readouterr().out
+        assert "--backend" in out
+        assert "faster-whisper" in out
+        assert "whisper-cpp" in out
+
+    def test_backend_flag_forwarded(self, monkeypatch, dummy_faster_whisper) -> None:
+        sentinel: dict = {}
+
+        def fake_transcribe_url(url, **kw):
+            sentinel.update(kw)
+            sentinel["url"] = url
+            raise SystemExit(0)
+
+        monkeypatch.setattr("localcaption.cli.transcribe_url", fake_transcribe_url)
+        with pytest.raises(SystemExit):
+            main(["--backend", "faster-whisper", "https://example.com/v"])
+        assert sentinel["backend"] == "faster-whisper"
+
+    def test_env_var_selects_backend(self, monkeypatch, dummy_faster_whisper) -> None:
+        sentinel: dict = {}
+
+        def fake_transcribe_url(url, **kw):
+            sentinel.update(kw)
+            raise SystemExit(0)
+
+        monkeypatch.setenv("LOCALCAPTION_BACKEND", "faster-whisper")
+        monkeypatch.setattr("localcaption.cli.transcribe_url", fake_transcribe_url)
+        with pytest.raises(SystemExit):
+            main(["https://example.com/v"])
+        assert sentinel["backend"] == "faster-whisper"
+
+    def test_flag_overrides_env(self, monkeypatch, tmp_path: Path) -> None:
+        sentinel: dict = {}
+
+        def fake_transcribe_url(url, **kw):
+            sentinel.update(kw)
+            raise SystemExit(0)
+
+        monkeypatch.setenv("LOCALCAPTION_BACKEND", "faster-whisper")
+        monkeypatch.setattr("localcaption.cli.transcribe_url", fake_transcribe_url)
+        missing = tmp_path / "no-whisper"
+        with pytest.raises(SystemExit):
+            main([
+                "--backend", "whisper-cpp",
+                "--whisper-dir", str(missing),
+                "https://example.com/v",
+            ])
+        assert sentinel["backend"] == "whisper-cpp"
+
+    def test_unknown_env_backend_errors(self, monkeypatch, capsys) -> None:
+        monkeypatch.setenv("LOCALCAPTION_BACKEND", "mlx")
+        rc = main(["https://example.com/v"])
+        assert rc == 1
+        err = capsys.readouterr().err
+        assert "Unknown transcription backend" in err
+
+    def test_faster_whisper_skips_ggml_preflight(
+        self, monkeypatch, tmp_path: Path, dummy_faster_whisper
+    ) -> None:
+        whisper_dir = tmp_path / "whisper.cpp"
+        whisper_dir.mkdir()
+        monkeypatch.setenv("LOCALCAPTION_WHISPER_DIR", str(whisper_dir))
+        sentinel: dict = {}
+
+        def fake_transcribe_url(url, **kw):
+            sentinel.update(kw)
+            raise SystemExit(0)
+
+        monkeypatch.setattr("localcaption.cli.transcribe_url", fake_transcribe_url)
+        with pytest.raises(SystemExit):
+            main(["--backend", "faster-whisper", "https://example.com/v"])
+        assert sentinel["backend"] == "faster-whisper"
+
+    def test_missing_extra_fails_before_pipeline(self, monkeypatch, capsys) -> None:
+        monkeypatch.setitem(sys.modules, "faster_whisper", None)
+        called: list[int] = []
+
+        def fake_transcribe_url(url, **kw):
+            called.append(1)
+            raise SystemExit(0)
+
+        monkeypatch.setattr("localcaption.cli.transcribe_url", fake_transcribe_url)
+        rc = main(["--backend", "faster-whisper", "https://example.com/v"])
+        assert rc == 1
+        assert called == []
+        assert "localcaption[faster]" in capsys.readouterr().err
 
 
 class TestCliLocalFileDispatch:
@@ -93,6 +187,7 @@ class TestCliBatch:
             sentinel["urls"] = urls
             sentinel["out_dir"] = kw["out_dir"]
             sentinel["model"] = kw["model"]
+            sentinel["backend"] = kw.get("backend")
             from localcaption.batch import BatchResult
 
             return BatchResult(items=[], wall_clock_s=0.0)
@@ -119,6 +214,7 @@ class TestCliBatch:
         ]
         assert sentinel["out_dir"] == out
         assert sentinel["model"] == "small.en"
+        assert sentinel["backend"] == "whisper-cpp"
         assert "total: 0" in capsys.readouterr().out
 
     def test_batch_missing_file_exits_1(self, tmp_path: Path) -> None:

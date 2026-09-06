@@ -24,7 +24,14 @@ from .batch import read_url_list, transcribe_urls
 from .errors import LocalCaptionError
 from .pipeline import transcribe_url
 from .summary import DEFAULT_MODEL as DEFAULT_SUMMARY_MODEL
-from .whisper import DEFAULT_MODEL, WhisperPaths
+from .whisper import (
+    BACKEND_NAMES,
+    BACKEND_WHISPER_CPP,
+    DEFAULT_MODEL,
+    WhisperPaths,
+    get_backend,
+    resolve_backend_name,
+)
 
 # Subcommands recognised by the dispatcher. Anything else is treated as a URL
 # and routed to the implicit "transcribe" command for backwards compatibility.
@@ -73,7 +80,7 @@ def _default_whisper_dir() -> Path:
 def _build_transcribe_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="localcaption",
-        description="Fully-local video → transcript using yt-dlp + ffmpeg + whisper.cpp.",
+        description="Fully-local video → transcript using yt-dlp + ffmpeg + a local whisper backend.",
     )
     parser.add_argument(
         "url",
@@ -99,9 +106,15 @@ def _build_transcribe_parser() -> argparse.ArgumentParser:
         help="ISO language code, or 'auto' (default: auto)",
     )
     parser.add_argument(
+        "--backend",
+        choices=BACKEND_NAMES,
+        default=None,
+        help="transcription backend (default: whisper-cpp, or $LOCALCAPTION_BACKEND)",
+    )
+    parser.add_argument(
         "--whisper-dir", type=Path, default=None,
         help="path to a built whisper.cpp checkout "
-             "(default: $LOCALCAPTION_WHISPER_DIR, ./whisper.cpp, "
+             "(whisper-cpp backend; default: $LOCALCAPTION_WHISPER_DIR, ./whisper.cpp, "
              "or ~/.local/share/localcaption/whisper.cpp)",
     )
     parser.add_argument(
@@ -201,21 +214,34 @@ def _cmd_transcribe(argv: list[str]) -> int:
             "provide a URL/file or --batch FILE" + (", not both" if has_batch else "")
         )
 
-    whisper_dir = args.whisper_dir or _default_whisper_dir()
+    try:
+        backend = resolve_backend_name(args.backend)
+    except LocalCaptionError as exc:
+        log.error(str(exc))
+        return 1
 
-    # Pre-flight: ensure the requested model is on disk before doing the (slow)
-    # download+ffmpeg dance. Cheap if already installed, helpful if not.
-    if whisper_dir.is_dir() and not _ensure_model_available(
-        args.model, whisper_dir, args.auto_download
+    whisper_dir = args.whisper_dir or _default_whisper_dir()
+    try:
+        get_backend(backend, whisper_dir=whisper_dir)
+    except LocalCaptionError as exc:
+        log.error(str(exc))
+        return 1
+
+    # Pre-flight ggml models only for whisper.cpp. faster-whisper fetches its
+    # own CTranslate2 weights on first use.
+    if (
+        backend == BACKEND_WHISPER_CPP
+        and whisper_dir.is_dir()
+        and not _ensure_model_available(args.model, whisper_dir, args.auto_download)
     ):
         return 1
 
     if args.batch:
-        return _run_batch(args, whisper_dir)
-    return _run_one(args, whisper_dir)
+        return _run_batch(args, whisper_dir, backend)
+    return _run_one(args, whisper_dir, backend)
 
 
-def _run_one(args: argparse.Namespace, whisper_dir: Path) -> int:
+def _run_one(args: argparse.Namespace, whisper_dir: Path, backend: str) -> int:
     try:
         result = transcribe_url(
             args.url,
@@ -224,6 +250,7 @@ def _run_one(args: argparse.Namespace, whisper_dir: Path) -> int:
             model=args.model,
             language=args.language,
             keep_intermediate=args.keep_audio,
+            backend=backend,
             summary=args.summary,
             summary_model=args.summary_model,
             summary_prompt=args.summary_prompt,
@@ -251,7 +278,7 @@ def _run_one(args: argparse.Namespace, whisper_dir: Path) -> int:
     return 0
 
 
-def _run_batch(args: argparse.Namespace, whisper_dir: Path) -> int:
+def _run_batch(args: argparse.Namespace, whisper_dir: Path, backend: str) -> int:
     if not args.batch.is_file():
         log.error(f"batch file not found: {args.batch}")
         return 1
@@ -270,6 +297,7 @@ def _run_batch(args: argparse.Namespace, whisper_dir: Path) -> int:
         model=args.model,
         language=args.language,
         keep_intermediate=args.keep_audio,
+        backend=backend,
     )
     print(result.summary())
     return result.exit_code()

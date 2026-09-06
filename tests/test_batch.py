@@ -14,7 +14,7 @@ from localcaption.batch import (
 )
 from localcaption.errors import DownloadError
 from localcaption.pipeline import PipelineResult
-from localcaption.whisper import TranscriptionResult
+from localcaption.whisper import BACKEND_FASTER_WHISPER, TranscriptionResult
 
 
 def _result(url: str, duration_s: float | None = 1120.0) -> PipelineResult:
@@ -177,6 +177,21 @@ class TestTranscribeUrls:
         assert captured["out_dir"] == out / "PSRJfaAYkW4"
         assert captured["stem"] == "PSRJfaAYkW4"
         assert captured["model"] == "small.en"
+
+    def test_forwards_backend(self, monkeypatch, tmp_path: Path) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_transcribe_url(url, **kw):
+            captured["backend"] = kw.get("backend")
+            return _result(url)
+
+        monkeypatch.setattr("localcaption.batch.transcribe_url", fake_transcribe_url)
+        transcribe_urls(
+            ["https://youtu.be/PSRJfaAYkW4"],
+            out_dir=tmp_path / "transcripts",
+            backend=BACKEND_FASTER_WHISPER,
+        )
+        assert captured["backend"] == BACKEND_FASTER_WHISPER
 
     def test_empty_list(self, tmp_path: Path) -> None:
         result = transcribe_urls(

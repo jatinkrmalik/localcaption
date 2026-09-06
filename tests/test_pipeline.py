@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 from localcaption.download import DownloadResult
+from localcaption.errors import DependencyError
 from localcaption.pipeline import PipelineResult, _is_local_file, transcribe_url
-from localcaption.whisper import TranscriptionResult, output_file
+from localcaption.whisper import (
+    BACKEND_FASTER_WHISPER,
+    DEFAULT_BACKEND,
+    TranscriptionResult,
+    output_file,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -70,7 +77,7 @@ class TestTranscribeUrlLocalFile:
         fake_transcripts = MagicMock()
         fake_transcripts.existing.return_value = {}
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             return fake_transcripts
 
         monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
@@ -104,7 +111,7 @@ class TestTranscribeUrlLocalFile:
             dst.write_text("fake wav")
             return dst
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             captured["out_base"] = out_base
             fake_transcripts = MagicMock()
             fake_transcripts.existing.return_value = {}
@@ -132,7 +139,7 @@ class TestTranscribeUrlLocalFile:
             dst.write_text("fake wav")
             return dst
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             captured["out_base"] = out_base
             fake_transcripts = MagicMock()
             fake_transcripts.existing.return_value = {}
@@ -171,7 +178,7 @@ class TestTranscribeUrlLocalFile:
         fake_transcripts = MagicMock()
         fake_transcripts.existing.return_value = {}
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             return fake_transcripts
 
         monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
@@ -203,7 +210,7 @@ class TestTranscribeUrlLocalFile:
         fake_transcripts = MagicMock()
         fake_transcripts.existing.return_value = {}
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             return fake_transcripts
 
         monkeypatch.setattr("localcaption.pipeline.to_whisper_wav", fake_to_whisper_wav)
@@ -236,7 +243,7 @@ class TestTranscribeUrlLocalFile:
         fake_transcripts = MagicMock()
         fake_transcripts.existing.return_value = {}
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             return fake_transcripts
 
         monkeypatch.setattr("localcaption.pipeline.to_whisper_wav", fake_to_whisper_wav)
@@ -254,6 +261,82 @@ class TestTranscribeUrlLocalFile:
         assert result.wav_path is None
         assert result.summary is None
 
+    def test_forwards_backend(self, monkeypatch, tmp_path: Path, dummy_faster_whisper) -> None:
+        video = tmp_path / "clip.mp4"
+        video.write_text("fake")
+        captured: dict = {}
+
+        def fake_to_whisper_wav(src, dst):
+            dst.write_text("fake wav")
+            return dst
+
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
+            captured["backend"] = kwargs.get("backend", DEFAULT_BACKEND)
+            fake_transcripts = MagicMock()
+            fake_transcripts.existing.return_value = {}
+            return fake_transcripts
+
+        monkeypatch.setattr("localcaption.pipeline.to_whisper_wav", fake_to_whisper_wav)
+        monkeypatch.setattr("localcaption.pipeline.transcribe", fake_transcribe)
+
+        transcribe_url(
+            str(video),
+            out_dir=tmp_path / "out",
+            backend=BACKEND_FASTER_WHISPER,
+        )
+        assert captured["backend"] == BACKEND_FASTER_WHISPER
+
+    def test_missing_faster_whisper_extra_skips_download(self, monkeypatch, tmp_path: Path) -> None:
+        monkeypatch.setitem(sys.modules, "faster_whisper", None)
+        download_called = False
+
+        def fake_download(url, work_dir):
+            nonlocal download_called
+            download_called = True
+            return work_dir / "downloaded.m4a"
+
+        monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
+
+        with pytest.raises(DependencyError, match="localcaption\\[faster\\]"):
+            transcribe_url(
+                "https://example.com/v",
+                out_dir=tmp_path / "out",
+                backend=BACKEND_FASTER_WHISPER,
+            )
+        assert download_called is False
+
+    def test_unknown_backend_skips_download(self, monkeypatch, tmp_path: Path) -> None:
+        download_called = False
+
+        def fake_download(url, work_dir):
+            nonlocal download_called
+            download_called = True
+            return work_dir / "downloaded.m4a"
+
+        monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
+
+        with pytest.raises(DependencyError, match="Unknown transcription backend"):
+            transcribe_url(
+                "https://example.com/v",
+                out_dir=tmp_path / "out",
+                backend="mlx",
+            )
+        assert download_called is False
+
+    def test_whisper_cpp_without_dir_skips_download(self, monkeypatch, tmp_path: Path) -> None:
+        download_called = False
+
+        def fake_download(url, work_dir):
+            nonlocal download_called
+            download_called = True
+            return work_dir / "downloaded.m4a"
+
+        monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
+
+        with pytest.raises(DependencyError, match="requires a whisper.cpp directory"):
+            transcribe_url("https://example.com/v", out_dir=tmp_path / "out")
+        assert download_called is False
+
 
 class TestTranscribeUrlSummary:
     def _stub_stages(self, monkeypatch) -> None:
@@ -261,7 +344,7 @@ class TestTranscribeUrlSummary:
             dst.write_text("fake wav")
             return dst
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             txt = out_base.with_suffix(".txt")
             txt.parent.mkdir(parents=True, exist_ok=True)
             txt.write_text("hello from the talk")
@@ -413,7 +496,7 @@ class TestChaptersAndIndex:
             dst.write_text("fake wav")
             return dst
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             return _write_whisper_outputs(out_base)
 
         monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
@@ -463,7 +546,7 @@ class TestChaptersAndIndex:
             dst.write_text("fake wav")
             return dst
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             return _write_whisper_outputs(out_base)
 
         monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
@@ -496,7 +579,7 @@ class TestChaptersAndIndex:
             dst.write_text("fake wav")
             return dst
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             return _write_whisper_outputs(out_base)
 
         monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
@@ -538,7 +621,7 @@ class TestChaptersAndIndex:
             dst.write_text("fake wav")
             return dst
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             return _write_whisper_outputs(out_base)
 
         monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
@@ -578,7 +661,7 @@ class TestChaptersAndIndex:
             dst.write_text("fake wav")
             return dst
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             return _write_whisper_outputs(out_base)
 
         monkeypatch.setattr("localcaption.pipeline.to_whisper_wav", fake_to_whisper_wav)
@@ -617,7 +700,7 @@ class TestChaptersAndIndex:
             dst.write_text("fake wav")
             return dst
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             return _write_whisper_outputs(out_base)
 
         monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)

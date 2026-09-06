@@ -14,7 +14,7 @@ from urllib.parse import unquote, urlparse
 
 from . import _logging as log
 from .pipeline import transcribe_url
-from .whisper import DEFAULT_MODEL
+from .whisper import DEFAULT_BACKEND, DEFAULT_MODEL, Backend
 
 # Watch, embed, shorts, live, youtu.be. Used so we can name the output dir
 # (and decide resume) without a yt-dlp metadata round-trip.
@@ -116,16 +116,18 @@ def transcribe_urls(
     urls: list[str],
     *,
     out_dir: Path,
-    whisper_dir: Path,
+    whisper_dir: Path | None = None,
     model: str = DEFAULT_MODEL,
     language: str = "auto",
     keep_intermediate: bool = False,
+    backend: str | Backend = DEFAULT_BACKEND,
 ) -> BatchResult:
     """Transcribe each source in *urls* sequentially.
 
     Per-URL output goes to ``out_dir/<videoId>/``. If
     ``<videoId>/<videoId>.txt`` already exists, that source is skipped.
     Failures are recorded and the rest of the list still runs.
+    *backend* is forwarded to :func:`transcribe_url`.
     """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -140,6 +142,7 @@ def transcribe_urls(
                 model=model,
                 language=language,
                 keep_intermediate=keep_intermediate,
+                backend=backend,
             )
         )
     return BatchResult(items=items, wall_clock_s=time.monotonic() - wall0)
@@ -149,10 +152,11 @@ def _transcribe_one(
     url: str,
     *,
     out_dir: Path,
-    whisper_dir: Path,
+    whisper_dir: Path | None,
     model: str,
     language: str,
     keep_intermediate: bool,
+    backend: str | Backend,
 ) -> BatchItem:
     if "://" not in url:
         url = str(Path(url).expanduser())
@@ -179,6 +183,7 @@ def _transcribe_one(
             language=language,
             keep_intermediate=keep_intermediate,
             stem=video_id,
+            backend=backend,
         )
     except Exception as exc:
         elapsed = time.monotonic() - t0

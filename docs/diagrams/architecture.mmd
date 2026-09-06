@@ -25,7 +25,7 @@ flowchart TB
             direction LR
             DL["download.py<br/><i>yt-dlp Python API</i>"]:::stage
             AU["audio.py<br/><i>ffmpeg subprocess</i>"]:::stage
-            WH["whisper.py<br/><i>whisper.cpp subprocess</i>"]:::stage
+            WH["whisper.py + backends/<br/><i>whisper.cpp · faster-whisper</i>"]:::stage
         end
 
         subgraph SUPPORT["support modules · used by all stages"]
@@ -39,7 +39,8 @@ flowchart TB
         direction LR
         YTDLP(["📦 yt-dlp<br/><i>pip dependency</i>"]):::extdep
         FFMPEG(["⚙️ ffmpeg<br/><i>system binary</i>"]):::extdep
-        WCPP(["⚙️ whisper.cpp<br/><i>built locally</i>"]):::extdep
+        WCPP(["⚙️ whisper.cpp<br/><i>built locally · default</i>"]):::extdep
+        FW(["📦 faster-whisper<br/><i>optional extra</i>"]):::extdep
         MODEL[/"🧠 ggml model<br/><i>./whisper.cpp/models/</i>"/]:::model
     end
 
@@ -54,6 +55,7 @@ flowchart TB
     DL  --> YTDLP
     AU  --> FFMPEG
     WH  --> WCPP
+    WH  --> FW
     WH  --> MODEL
 
     classDef user    fill:#FEF3C7,stroke:#D97706,color:#78350F,font-weight:bold,stroke-width:2px;

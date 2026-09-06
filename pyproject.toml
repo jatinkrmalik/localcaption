@@ -38,6 +38,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+faster = [
+    "faster-whisper>=1.0",
+]
 dev = [
     "pytest>=7",
     "pytest-cov>=4",

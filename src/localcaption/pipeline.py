@@ -26,7 +26,15 @@ from .download import download_audio
 from .index import upsert_index
 from .summary import DEFAULT_MODEL as DEFAULT_SUMMARY_MODEL
 from .summary import write_summary
-from .whisper import DEFAULT_MODEL, TranscriptionResult, output_file, transcribe
+from .whisper import (
+    DEFAULT_BACKEND,
+    DEFAULT_MODEL,
+    Backend,
+    TranscriptionResult,
+    get_backend,
+    output_file,
+    transcribe,
+)
 
 
 @dataclass(frozen=True)
@@ -52,11 +60,12 @@ def transcribe_url(
     url: str,
     *,
     out_dir: Path,
-    whisper_dir: Path,
+    whisper_dir: Path | None = None,
     model: str = DEFAULT_MODEL,
     language: str = "auto",
     keep_intermediate: bool = False,
     stem: str | None = None,
+    backend: str | Backend = DEFAULT_BACKEND,
     summary: bool = False,
     summary_model: str = DEFAULT_SUMMARY_MODEL,
     summary_prompt: Path | None = None,
@@ -73,14 +82,17 @@ def transcribe_url(
         Directory for the final transcript files.
     whisper_dir:
         Path to the whisper.cpp checkout (built and with a ggml model present).
+        Required for the whisper-cpp backend; ignored by faster-whisper.
     model:
-        whisper.cpp model name (e.g. ``base.en``, ``small.en``, ``large-v3``).
+        Model name (e.g. ``base.en``, ``small.en``, ``large-v3``).
     language:
         ISO language code or ``"auto"`` to let whisper detect it.
     keep_intermediate:
         If True, leave the downloaded audio + 16 kHz WAV in ``out_dir/.work``.
     stem:
         Basename for transcript files. Defaults to the audio/file stem.
+    backend:
+        Backend name (``whisper-cpp``, ``faster-whisper``) or a :class:`Backend`.
     summary:
         If True, POST the ``.txt`` transcript to local Ollama and write
         ``<id>.summary.md``. Failures are warnings; they do not raise.
@@ -90,6 +102,10 @@ def transcribe_url(
         Optional path to a prompt template. ``{transcript}`` is substituted
         if present; otherwise the transcript is appended.
     """
+    # Validate named backends before yt-dlp/ffmpeg.
+    if isinstance(backend, str):
+        get_backend(backend, whisper_dir=whisper_dir)
+
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     work_dir = out_dir / ".work"
@@ -120,7 +136,12 @@ def transcribe_url(
 
         out_base = out_dir / (stem or audio_path.stem)
         transcripts = transcribe(
-            wav_path, model, out_base, whisper_dir=whisper_dir, language=language
+            wav_path,
+            model,
+            out_base,
+            whisper_dir=whisper_dir,
+            language=language,
+            backend=backend,
         )
 
         chapters = chapters_from_info(info)

@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Pluggable transcription backends. `whisper.cpp` stays the default;
+  `faster-whisper` is available via `pip install localcaption[faster]`.
+  Select with `--backend {whisper-cpp,faster-whisper}` or
+  `$LOCALCAPTION_BACKEND`. `whisper_dir` is only required for whisper.cpp.
 - **Batch mode.** `localcaption --batch urls.txt` transcribes each non-empty,
   non-`#` line sequentially (URLs or local files). Output goes to
   `<out>/<videoId>/` so items cannot clobber each other; if

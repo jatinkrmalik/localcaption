@@ -45,10 +45,11 @@ sequenceDiagram
 
     rect rgb(252, 231, 243)
     note right of Pipe: Stage 3 · Transcribe
-    Pipe->>Whisper: transcribe(wav, model, out_base, whisper_dir)
-    Whisper->>Whisper: WhisperPaths.find_binary()
-    Whisper->>WCPP: subprocess(whisper-cli -m model -f wav -otxt -osrt -ovtt -oj)
-    note over WCPP: Metal on Apple Silicon<br/>CUDA on NVIDIA<br/>CPU fallback otherwise
+    Pipe->>Whisper: transcribe(wav, model, out_base, backend)
+    note over Whisper,WCPP: backend: whisper-cpp (default) or faster-whisper
+    Whisper->>Whisper: get_backend(name)
+    Whisper->>WCPP: whisper-cli or faster_whisper.WhisperModel
+    note over WCPP: Metal / CUDA / CPU depending on backend
     WCPP-->>Whisper: writes .txt / .srt / .vtt / .json
     Whisper-->>Pipe: TranscriptionResult
     end
