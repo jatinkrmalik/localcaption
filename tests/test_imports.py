@@ -30,5 +30,5 @@ def test_pipeline_public_surface() -> None:
 
     assert callable(transcribe_url)
     assert PipelineResult.__dataclass_fields__.keys() >= {
-        "source_url", "audio_path", "wav_path", "transcripts",
+        "source_url", "audio_path", "wav_path", "transcripts", "summary",
     }
