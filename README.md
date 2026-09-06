@@ -196,7 +196,7 @@ localcaption ./talk.mp4 --summary --summary-model llama3.1:8b
    3. `./whisper.cpp` (dev checkout).
    4. `~/.local/share/localcaption/whisper.cpp` (where `install.sh` puts it).
 
-Outputs `<videoId>.txt`, `.srt`, `.vtt`, and `.json` in the chosen directory. For local files, the output filename is derived from the input file's name. With `--summary`, also writes `<videoId>.summary.md`.
+Outputs `<videoId>.txt`, `.srt`, `.vtt`, and `.json` in the chosen directory. For local files, the output filename is derived from the input file's name. With `--summary`, also writes `<videoId>.summary.md`. When the source has chapter markers (typical on YouTube), also writes `<videoId>.chapters.json` and `<videoId>.chaptered.md`. The raw whisper `.txt` is left unchanged.
 
 `--batch FILE` writes each item into `<out>/<videoId>/` and skips any video
 whose `.txt` is already there, so you can re-run a list after a failure.
@@ -233,6 +233,23 @@ The transcript files are unchanged.
 | `localcaption model info <name>` | Show metadata about a single model. |
 | `localcaption model download <name>` | Download a model with progress bar + atomic writes. |
 | `localcaption model rm <name>` | Remove an installed model to free disk space. |
+| `localcaption search <term>` | Grep previously transcribed videos. Ranked matches with timestamps. |
+
+### Search past transcripts
+
+Each successful transcription appends one JSON line to
+`~/.local/share/localcaption/index.jsonl` (`id`, `url`, `title`, `duration`,
+`chapters`, `transcript`). Override the path with `LOCALCAPTION_INDEX_PATH`.
+
+```bash
+localcaption search "install"
+# vid123  02:30  First, let's install pip
+#         Lecture on Python tooling
+```
+
+Search is a case-insensitive substring. Hits are ranked by how often the term
+appears (title matches get a small boost). Timestamps come from the sibling
+whisper `.json` or `.srt` when those files are still next to the `.txt`.
 
 ### Managing models
 
@@ -324,6 +341,7 @@ for `faster-whisper` without touching `download.py` or `audio.py`.
 | Entry points | `cli.py`, `__main__.py` | argparse, exit codes, stdout formatting |
 | Orchestration | `pipeline.py`, `batch.py` | public Python API: `transcribe_url(...)`, `transcribe_urls(...)` |
 | Pipeline stages | `download.py`, `audio.py`, `whisper.py`, `summary.py` | one external tool each (`summary.py` is optional, Ollama) |
+| Chapters & search | `chapters.py`, `index.py` | YouTube chapter sidecars + JSONL search index |
 | Support | `errors.py`, `_logging.py` | exception hierarchy, tiny logger |
 
 ### Runtime sequence
