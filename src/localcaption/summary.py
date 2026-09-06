@@ -22,6 +22,10 @@ DEFAULT_MODEL = "llama3.1:8b"
 DEFAULT_ENDPOINT = "http://localhost:11434/api/generate"
 DEFAULT_TIMEOUT = 120.0
 
+# Ignore HTTP(S)_PROXY. Ollama is local; a proxy would either fail the
+# request or send the transcript off-machine.
+_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 def load_prompt(path: Path | None = None) -> str:
     """Return the prompt template from *path*, or the built-in default."""
@@ -45,22 +49,22 @@ def generate(
     timeout: float = DEFAULT_TIMEOUT,
 ) -> str | None:
     """POST *transcript* to Ollama. Return the summary text, or None on failure."""
-    template = prompt if prompt is not None else load_prompt()
-    body = json.dumps(
-        {
-            "model": model,
-            "prompt": _build_prompt(template, transcript),
-            "stream": False,
-        }
-    ).encode("utf-8")
-    req = urllib.request.Request(
-        endpoint,
-        data=body,
-        headers={"Content-Type": "application/json", "User-Agent": "localcaption"},
-        method="POST",
-    )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        template = prompt if prompt is not None else load_prompt()
+        body = json.dumps(
+            {
+                "model": model,
+                "prompt": _build_prompt(template, transcript),
+                "stream": False,
+            }
+        ).encode("utf-8")
+        req = urllib.request.Request(
+            endpoint,
+            data=body,
+            headers={"Content-Type": "application/json", "User-Agent": "localcaption"},
+            method="POST",
+        )
+        with _OPENER.open(req, timeout=timeout) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = f"HTTP {exc.code}"
@@ -73,15 +77,19 @@ def generate(
         log.warn(f"Ollama request failed ({detail}). Summary skipped.")
         return None
     except urllib.error.URLError as exc:
+        reason = exc.reason
+        if isinstance(reason, TimeoutError):
+            log.warn(f"Ollama request timed out after {timeout:.0f}s. Summary skipped.")
+            return None
         log.warn(
-            f"Ollama is not reachable at {endpoint} ({exc.reason}). "
+            f"Ollama is not reachable at {endpoint} ({reason}). "
             "Is Ollama running? Summary skipped."
         )
         return None
     except TimeoutError:
         log.warn(f"Ollama request timed out after {timeout:.0f}s. Summary skipped.")
         return None
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
+    except Exception as exc:
         log.warn(f"Ollama summary failed ({exc}). Summary skipped.")
         return None
 
@@ -90,7 +98,8 @@ def generate(
         return None
 
     error = payload.get("error")
-    text = (payload.get("response") or "").strip()
+    raw = payload.get("response")
+    text = raw.strip() if isinstance(raw, str) else ""
     if error and not text:
         log.warn(f"Ollama error: {error}. Summary skipped.")
         return None
@@ -118,7 +127,11 @@ def write_summary(
         log.warn(f"transcript not found at {txt_path}; skipping summary")
         return None
 
-    transcript = txt_path.read_text(encoding="utf-8", errors="replace")
+    try:
+        transcript = txt_path.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        log.warn(f"could not read transcript at {txt_path}: {exc}. Summary skipped.")
+        return None
     if not transcript.strip():
         log.warn("transcript is empty; skipping summary")
         return None

@@ -311,7 +311,7 @@ print(result.summary())
 ## Architecture
 
 `localcaption` is intentionally tiny: an orchestrator (`pipeline.py`) drives
-three single-responsibility stages, each wrapping one external tool. The
+single-responsibility stages, each wrapping one external tool. The
 modules are split this way so that a contributor can swap, say, `whisper.cpp`
 for `faster-whisper` without touching `download.py` or `audio.py`.
 

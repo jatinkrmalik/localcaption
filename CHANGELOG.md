@@ -19,8 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`http://localhost:11434/api/generate`) and writes `<id>.summary.md`
   next to it. `--summary-model` (default `llama3.1:8b`) and
   `--summary-prompt PATH` override the model and the built-in prompt
-  (TL;DR, key points, notable quotes, action items). If Ollama is not
-  reachable the pipeline still succeeds and prints a warning.
+  (TL;DR, key points, notable quotes, action items). If Ollama is down,
+  times out, or returns a bad response, the pipeline still succeeds and
+  prints a warning. `HTTP_PROXY` is ignored for this call.
 
 ### Changed
 - Default whisper model is now `small.en` instead of `base.en`. Better

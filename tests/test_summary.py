@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import socket
 import threading
+import urllib.error
+import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -26,6 +28,7 @@ class _FakeOllamaHandler(BaseHTTPRequestHandler):
     raw_body: bytes | None = None  # send this instead of wrapping response_text
     last_body: bytes | None = None
     last_path: str | None = None
+    incomplete = False  # lie about Content-Length so the client sees a short body
 
     def do_POST(self):  # noqa: N802
         length = int(self.headers.get("Content-Length", "0"))
@@ -54,7 +57,8 @@ class _FakeOllamaHandler(BaseHTTPRequestHandler):
 
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
+        claimed = len(body) + 1000 if self.incomplete else len(body)
+        self.send_header("Content-Length", str(claimed))
         self.end_headers()
         self.wfile.write(body)
 
@@ -70,6 +74,7 @@ def fake_ollama():
     _FakeOllamaHandler.raw_body = None
     _FakeOllamaHandler.last_body = None
     _FakeOllamaHandler.last_path = None
+    _FakeOllamaHandler.incomplete = False
 
     server = HTTPServer(("127.0.0.1", 0), _FakeOllamaHandler)
     port = server.server_address[1]
@@ -222,6 +227,47 @@ def test_invalid_json_returns_none(fake_ollama, capsys) -> None:
     assert "Summary skipped" in capsys.readouterr().err
 
 
+def test_incomplete_http_body_returns_none(fake_ollama, capsys) -> None:
+    endpoint, handler = fake_ollama
+    handler.incomplete = True
+    result = summary.generate("hello", endpoint=endpoint, timeout=5)
+    assert result is None
+    err = capsys.readouterr().err
+    assert "Summary skipped" in err
+
+
+def test_non_string_response_returns_none(fake_ollama, capsys) -> None:
+    endpoint, handler = fake_ollama
+    handler.raw_body = json.dumps({"response": {"nested": True}}).encode()
+    result = summary.generate("hello", endpoint=endpoint, timeout=5)
+    assert result is None
+    assert "empty summary" in capsys.readouterr().err
+
+
+def test_generate_ignores_http_proxy(fake_ollama, monkeypatch) -> None:
+    monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:1")
+    monkeypatch.setenv("http_proxy", "http://127.0.0.1:1")
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    monkeypatch.delenv("no_proxy", raising=False)
+    urllib.request._opener = None
+    endpoint, _handler = fake_ollama
+    text = summary.generate("hello", endpoint=endpoint, timeout=5)
+    assert text is not None
+    assert "widgets" in text
+
+
+def test_urlerror_timeout_says_timed_out(monkeypatch, capsys) -> None:
+    def boom(*args, **kwargs):
+        raise urllib.error.URLError(TimeoutError("timed out"))
+
+    monkeypatch.setattr(summary._OPENER, "open", boom)
+    result = summary.generate("hello", timeout=1)
+    assert result is None
+    err = capsys.readouterr().err
+    assert "timed out" in err
+    assert "not reachable" not in err
+
+
 def test_missing_transcript_skips(tmp_path: Path, capsys) -> None:
     result = summary.write_summary(tmp_path / "missing.txt")
     assert result is None
@@ -244,3 +290,16 @@ def test_missing_prompt_file_skips(tmp_path: Path, capsys) -> None:
     )
     assert result is None
     assert "could not read summary prompt" in capsys.readouterr().err
+
+
+def test_write_summary_incomplete_body_skips(
+    tmp_path: Path, fake_ollama, capsys
+) -> None:
+    endpoint, handler = fake_ollama
+    handler.incomplete = True
+    txt = tmp_path / "talk.txt"
+    txt.write_text("hello", encoding="utf-8")
+    result = summary.write_summary(txt, endpoint=endpoint, timeout=5)
+    assert result is None
+    assert not (tmp_path / "talk.summary.md").exists()
+    assert "Summary skipped" in capsys.readouterr().err
