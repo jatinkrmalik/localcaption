@@ -171,6 +171,10 @@ localcaption ./recording.wav
 
 # Batch: one URL or local path per line (# comments and blank lines ignored)
 localcaption --batch urls.txt -o transcripts/ -m small.en
+
+# Transcript + local summary (requires a running Ollama)
+localcaption "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --summary
+localcaption ./talk.mp4 --summary --summary-model llama3.1:8b
 ```
 
 | flag | default | what it does |
@@ -182,6 +186,9 @@ localcaption --batch urls.txt -o transcripts/ -m small.en
 | `--keep-audio` | off | keep the downloaded audio + intermediate WAV in `<out>/.work/` |
 | `--no-print` | off | don't echo the transcript to stdout |
 | `--batch FILE` | off | transcribe each non-empty, non-`#` line in FILE sequentially |
+| `--summary` | off | after transcription, write `<id>.summary.md` via local Ollama |
+| `--summary-model` | `llama3.1:8b` | Ollama model used by `--summary` |
+| `--summary-prompt` | built-in | path to a prompt template (`{transcript}` is replaced if present) |
 
 ¹ `--whisper-dir` resolution order:
    1. The explicit flag value, if given.
@@ -189,7 +196,7 @@ localcaption --batch urls.txt -o transcripts/ -m small.en
    3. `./whisper.cpp` (dev checkout).
    4. `~/.local/share/localcaption/whisper.cpp` (where `install.sh` puts it).
 
-Outputs `<videoId>.txt`, `.srt`, `.vtt`, and `.json` in the chosen directory. For local files, the output filename is derived from the input file's name.
+Outputs `<videoId>.txt`, `.srt`, `.vtt`, and `.json` in the chosen directory. For local files, the output filename is derived from the input file's name. With `--summary`, also writes `<videoId>.summary.md`.
 
 `--batch FILE` writes each item into `<out>/<videoId>/` and skips any video
 whose `.txt` is already there, so you can re-run a list after a failure.
@@ -198,6 +205,22 @@ is sequential (whisper.cpp already saturates the machine). Exit 0 if
 everything succeeded or was skipped, 1 otherwise.
 
 You can also invoke it as a module: `python -m localcaption <url-or-file>`.
+
+### Summaries (optional)
+
+If [Ollama](https://ollama.com) is running locally, `--summary` sends the
+`.txt` transcript to `http://localhost:11434/api/generate` and writes
+`<id>.summary.md` next to it. The built-in prompt asks for a TL;DR, key
+points, notable quotes, and action items.
+
+```bash
+localcaption <url-or-file> --summary
+localcaption <url-or-file> --summary --summary-model mistral
+localcaption <url-or-file> --summary --summary-prompt ./my_prompt.txt
+```
+
+If Ollama isn't reachable, localcaption logs a warning and still exits 0.
+The transcript files are unchanged.
 
 ### Subcommands
 
@@ -265,6 +288,7 @@ result = transcribe_url(
     out_dir=Path("transcripts"),
     whisper_dir=Path("whisper.cpp"),
     model="small.en",
+    summary=True,  # optional; writes .summary.md via local Ollama
 )
 print(result.transcripts.txt.read_text())
 ```
@@ -299,7 +323,7 @@ for `faster-whisper` without touching `download.py` or `audio.py`.
 |---|---|---|
 | Entry points | `cli.py`, `__main__.py` | argparse, exit codes, stdout formatting |
 | Orchestration | `pipeline.py`, `batch.py` | public Python API: `transcribe_url(...)`, `transcribe_urls(...)` |
-| Pipeline stages | `download.py`, `audio.py`, `whisper.py` | one external tool each |
+| Pipeline stages | `download.py`, `audio.py`, `whisper.py`, `summary.py` | one external tool each (`summary.py` is optional, Ollama) |
 | Support | `errors.py`, `_logging.py` | exception hierarchy, tiny logger |
 
 ### Runtime sequence
