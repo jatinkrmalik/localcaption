@@ -75,32 +75,40 @@ class BatchResult:
 
 
 def read_url_list(path: Path) -> list[str]:
-    """Return sources from *path*: one per line, skipping blanks and ``#`` comments."""
+    """Return sources from *path*: one per line, skipping blanks and ``#`` comments.
+
+    Local paths expand ``~``. Relative local paths are resolved against the
+    list file's directory (not the process cwd), so a queue sitting next to
+    its media files still works when you pass an absolute ``--batch`` path.
+    """
+    list_path = Path(path)
+    base = list_path.parent
     urls: list[str] = []
-    for line in Path(path).read_text(encoding="utf-8-sig").splitlines():
+    for line in list_path.read_text(encoding="utf-8-sig").splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        urls.append(stripped)
+        urls.append(_normalize_local_source(stripped, base))
     return urls
 
 
 def video_id_for(source: str) -> str:
     """Stable id used for ``<out>/<id>/<id>.txt`` (resume + isolated output).
 
-    YouTube URLs use the 11-character video id. Local files use the filename
-    stem (same as :func:`transcribe_url`). Other URLs use the last path
-    segment, prefixed with the host so two sites cannot share a folder.
+    YouTube URLs use the 11-character video id. Local files use a sanitized
+    path so two ``episode.mp3`` files in different folders do not share a
+    directory. Other URLs use host + full path so two sites (or two shows
+    on one CDN) cannot clobber each other.
     """
     if "://" not in source:
-        return _safe_id(Path(source).stem or "local")
+        return _safe_id(Path(source).expanduser().as_posix())
     match = _YOUTUBE_ID_RE.search(source)
     if match:
         return match.group(1)
     parsed = urlparse(source)
     host = (parsed.hostname or "url").removeprefix("www.")
     parts = [unquote(p) for p in parsed.path.split("/") if p]
-    tail = Path(parts[-1]).stem if parts else "video"
+    tail = "_".join(parts) if parts else "video"
     return _safe_id(f"{host}_{tail}")
 
 
@@ -146,6 +154,8 @@ def _transcribe_one(
     language: str,
     keep_intermediate: bool,
 ) -> BatchItem:
+    if "://" not in url:
+        url = str(Path(url).expanduser())
     video_id = video_id_for(url)
     item_dir = out_dir / video_id
     existing = item_dir / f"{video_id}.txt"
@@ -189,6 +199,16 @@ def _transcribe_one(
         duration_s=result.duration_s,
         elapsed_s=time.monotonic() - t0,
     )
+
+
+def _normalize_local_source(source: str, base: Path) -> str:
+    """Expand ``~``; make relative local paths relative to *base*."""
+    if "://" in source:
+        return source
+    path = Path(source).expanduser()
+    if not path.is_absolute():
+        path = base / path
+    return str(path)
 
 
 def _safe_id(raw: str) -> str:

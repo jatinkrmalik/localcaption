@@ -139,3 +139,42 @@ class TestCliBatch:
             main(["https://youtu.be/PSRJfaAYkW4", "--batch", str(listing)])
         assert excinfo.value.code == 2
 
+    def test_neither_url_nor_batch_exits_2(self, capsys) -> None:
+        with pytest.raises(SystemExit) as excinfo:
+            main(["-m", "small.en"])
+        assert excinfo.value.code == 2
+        err = capsys.readouterr().err
+        assert "provide a URL/file or --batch FILE" in err
+        assert "not both" not in err
+
+    def test_batch_nonzero_when_items_fail(self, monkeypatch, tmp_path: Path) -> None:
+        listing = tmp_path / "urls.txt"
+        listing.write_text("https://youtu.be/PSRJfaAYkW4\n", encoding="utf-8")
+
+        def fake_transcribe_urls(urls, **kw):
+            from localcaption.batch import BatchItem, BatchResult
+
+            return BatchResult(
+                items=[
+                    BatchItem(
+                        source=urls[0],
+                        video_id="PSRJfaAYkW4",
+                        status="failed",
+                        duration_s=None,
+                        elapsed_s=0.0,
+                        error="DownloadError: HTTP 403",
+                    )
+                ],
+                wall_clock_s=1.0,
+            )
+
+        monkeypatch.setattr("localcaption.cli.transcribe_urls", fake_transcribe_urls)
+        rc = main(
+            [
+                "--batch",
+                str(listing),
+                "--whisper-dir",
+                str(tmp_path / "missing-whisper"),
+            ]
+        )
+        assert rc == 1

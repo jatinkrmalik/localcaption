@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from localcaption.batch import (
+    BatchItem,
     BatchResult,
     read_url_list,
     transcribe_urls,
@@ -52,6 +53,19 @@ class TestReadUrlList:
         listing.write_text("", encoding="utf-8")
         assert read_url_list(listing) == []
 
+    def test_relative_local_paths_are_vs_list_file(self, tmp_path: Path) -> None:
+        media = tmp_path / "podcasts"
+        media.mkdir()
+        listing = media / "urls.txt"
+        listing.write_text("ep.mp3\n./also.wav\n", encoding="utf-8")
+        assert read_url_list(listing) == [str(media / "ep.mp3"), str(media / "also.wav")]
+
+    def test_expands_user_in_local_paths(self, tmp_path: Path, monkeypatch) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        listing = tmp_path / "urls.txt"
+        listing.write_text("~/talk.mp4\n", encoding="utf-8")
+        assert read_url_list(listing) == [str(tmp_path / "talk.mp4")]
+
 
 class TestVideoIdFor:
     def test_youtube_watch_url(self) -> None:
@@ -60,11 +74,27 @@ class TestVideoIdFor:
     def test_youtu_be(self) -> None:
         assert video_id_for("https://youtu.be/PSRJfaAYkW4") == "PSRJfaAYkW4"
 
-    def test_local_file_stem(self, tmp_path: Path) -> None:
-        assert video_id_for(str(tmp_path / "interview.mkv")) == "interview"
+    def test_youtube_shorts_and_extra_query(self) -> None:
+        assert video_id_for("https://www.youtube.com/shorts/aircAruvnKk") == "aircAruvnKk"
+        assert (
+            video_id_for("https://www.youtube.com/watch?v=aircAruvnKk&t=30")
+            == "aircAruvnKk"
+        )
+
+    def test_local_files_same_stem_different_dirs(self, tmp_path: Path) -> None:
+        a = tmp_path / "show1" / "audio.mp3"
+        b = tmp_path / "show2" / "audio.mp3"
+        assert video_id_for(str(a)) != video_id_for(str(b))
+        assert "audio" in video_id_for(str(a))
 
     def test_other_site_namespaces_host(self) -> None:
         assert video_id_for("https://vimeo.com/148751763") == "vimeo.com_148751763"
+
+    def test_url_path_not_just_last_segment(self) -> None:
+        a = "https://cdn.example.com/show1/latest.mp3"
+        b = "https://cdn.example.com/show2/latest.mp3"
+        assert video_id_for(a) != video_id_for(b)
+        assert video_id_for(a) == "cdn.example.com_show1_latest.mp3"
 
 
 class TestTranscribeUrls:
@@ -178,8 +208,52 @@ class TestTranscribeUrls:
         assert order == urls
         assert [i.status for i in result.items] == ["ok", "failed", "ok"]
 
+    def test_same_stem_local_files_both_run(self, monkeypatch, tmp_path: Path) -> None:
+        called: list[str] = []
+
+        def fake_transcribe_url(url, **kw):
+            called.append(url)
+            return _result(url)
+
+        monkeypatch.setattr("localcaption.batch.transcribe_url", fake_transcribe_url)
+        urls = [
+            str(tmp_path / "show1" / "audio.mp3"),
+            str(tmp_path / "show2" / "audio.mp3"),
+        ]
+        result = transcribe_urls(urls, out_dir=tmp_path / "t", whisper_dir=tmp_path / "w")
+        assert called == urls
+        assert [i.status for i in result.items] == ["ok", "ok"]
+        assert result.items[0].video_id != result.items[1].video_id
+
+    def test_expands_tilde_before_transcribe(self, monkeypatch, tmp_path: Path) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        captured: list[str] = []
+
+        def fake_transcribe_url(url, **kw):
+            captured.append(url)
+            return _result(url)
+
+        monkeypatch.setattr("localcaption.batch.transcribe_url", fake_transcribe_url)
+        transcribe_urls(
+            ["~/talk.mp4"],
+            out_dir=tmp_path / "t",
+            whisper_dir=tmp_path / "w",
+        )
+        assert captured == [str(tmp_path / "talk.mp4")]
+
 
 class TestBatchResultSummary:
     def test_exit_zero_when_only_skips(self) -> None:
-        result = BatchResult(items=[], wall_clock_s=0)
+        result = BatchResult(
+            items=[
+                BatchItem(
+                    source="https://youtu.be/PSRJfaAYkW4",
+                    video_id="PSRJfaAYkW4",
+                    status="skipped",
+                    duration_s=None,
+                    elapsed_s=0.0,
+                )
+            ],
+            wall_clock_s=0,
+        )
         assert result.exit_code() == 0

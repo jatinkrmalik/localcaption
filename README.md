@@ -193,8 +193,9 @@ Outputs `<videoId>.txt`, `.srt`, `.vtt`, and `.json` in the chosen directory. Fo
 
 `--batch FILE` writes each item into `<out>/<videoId>/` and skips any video
 whose `.txt` is already there, so you can re-run a list after a failure.
-The process is sequential (whisper.cpp already saturates the machine). Exit
-0 if everything succeeded or was skipped, 1 otherwise.
+Local paths are relative to the list file (and `~` is expanded). The process
+is sequential (whisper.cpp already saturates the machine). Exit 0 if
+everything succeeded or was skipped, 1 otherwise.
 
 You can also invoke it as a module: `python -m localcaption <url-or-file>`.
 

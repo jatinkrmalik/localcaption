@@ -180,8 +180,12 @@ def _ensure_model_available(model: str, whisper_dir: Path, auto: bool) -> bool:
 def _cmd_transcribe(argv: list[str]) -> int:
     parser = _build_transcribe_parser()
     args = parser.parse_args(argv)
-    if (args.batch is not None) == bool(args.url):
-        parser.error("provide a URL/file or --batch FILE, not both")
+    has_batch = args.batch is not None
+    has_url = bool(args.url)
+    if has_batch == has_url:
+        parser.error(
+            "provide a URL/file or --batch FILE" + (", not both" if has_batch else "")
+        )
 
     whisper_dir = args.whisper_dir or _default_whisper_dir()
 
