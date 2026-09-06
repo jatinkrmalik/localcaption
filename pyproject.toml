@@ -5,15 +5,35 @@ build-backend = "hatchling.build"
 [project]
 name = "localcaption"
 version = "0.4.0"
-description = "Fully-local video → transcript pipeline using yt-dlp, ffmpeg, and whisper.cpp. Supports YouTube, Vimeo, Twitch, and 1000+ sites. No API keys."
+description = "Local, offline Whisper transcription for YouTube, Vimeo, Twitch, and local video/audio. Writes SRT, VTT, JSON, and text. No API keys. whisper.cpp by default, optional faster-whisper."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "Jatin Kumar Malik" }]
 keywords = [
-    "whisper", "whisper.cpp", "yt-dlp", "youtube", "vimeo", "twitch",
-    "transcription", "captions", "subtitles", "speech-to-text", "local",
-    "video", "download",
+    "whisper",
+    "whisper.cpp",
+    "openai-whisper",
+    "faster-whisper",
+    "yt-dlp",
+    "youtube",
+    "youtube-transcript",
+    "vimeo",
+    "twitch",
+    "transcription",
+    "captions",
+    "subtitles",
+    "srt",
+    "vtt",
+    "speech-to-text",
+    "speech-recognition",
+    "asr",
+    "local",
+    "offline",
+    "privacy",
+    "ollama",
+    "batch",
+    "video",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
