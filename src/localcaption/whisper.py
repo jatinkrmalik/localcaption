@@ -16,7 +16,7 @@ from pathlib import Path
 from . import _logging as log
 from .errors import DependencyError, TranscriptionError
 
-DEFAULT_MODEL = "base.en"
+DEFAULT_MODEL = "small.en"
 SUPPORTED_OUTPUT_FORMATS = ("txt", "srt", "vtt", "json")
 
 

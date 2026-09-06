@@ -16,6 +16,7 @@ class TestCliHelpText:
         assert excinfo.value.code == 0
         out = capsys.readouterr().out
         assert "local video/audio file" in out
+        assert "default: small.en" in out
 
     def test_top_level_help_mentions_url_or_file(self, capsys) -> None:
         rc = main([])
@@ -32,24 +33,30 @@ class TestCliLocalFileDispatch:
 
         def fake_transcribe_url(url, **kw):
             sentinel["url"] = url
+            sentinel["model"] = kw.get("model")
             raise SystemExit(0)
 
         monkeypatch.setattr("localcaption.cli.transcribe_url", fake_transcribe_url)
+        monkeypatch.setattr("localcaption.cli._ensure_model_available", lambda *_a, **_k: True)
         with pytest.raises(SystemExit):
             main([str(video)])
         assert sentinel["url"] == str(video)
+        assert sentinel["model"] == "small.en"
 
     def test_url_still_passed_to_pipeline(self, monkeypatch) -> None:
         sentinel: dict[str, str] = {}
 
         def fake_transcribe_url(url, **kw):
             sentinel["url"] = url
+            sentinel["model"] = kw.get("model")
             raise SystemExit(0)
 
         monkeypatch.setattr("localcaption.cli.transcribe_url", fake_transcribe_url)
+        monkeypatch.setattr("localcaption.cli._ensure_model_available", lambda *_a, **_k: True)
         with pytest.raises(SystemExit):
             main(["https://www.youtube.com/watch?v=dQw4w9WgXcQ"])
         assert sentinel["url"] == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        assert sentinel["model"] == "small.en"
 
     def test_relative_local_file_passed_to_pipeline(self, monkeypatch, tmp_path: Path) -> None:
         video = tmp_path / "relative.mp4"
@@ -58,9 +65,12 @@ class TestCliLocalFileDispatch:
 
         def fake_transcribe_url(url, **kw):
             sentinel["url"] = url
+            sentinel["model"] = kw.get("model")
             raise SystemExit(0)
 
         monkeypatch.setattr("localcaption.cli.transcribe_url", fake_transcribe_url)
+        monkeypatch.setattr("localcaption.cli._ensure_model_available", lambda *_a, **_k: True)
         with pytest.raises(SystemExit):
             main(["./relative.mp4"])
         assert sentinel["url"] == "./relative.mp4"
+        assert sentinel["model"] == "small.en"

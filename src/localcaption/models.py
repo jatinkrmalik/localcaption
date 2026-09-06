@@ -62,9 +62,9 @@ class ModelSpec:
 _REGISTRY: tuple[ModelSpec, ...] = (
     ModelSpec("tiny.en",         75,    "smallest English-only — fastest, lowest quality"),
     ModelSpec("tiny",            75,    "smallest multilingual — fastest, lowest quality"),
-    ModelSpec("base.en",        142,    "small English-only — current install default"),
+    ModelSpec("base.en",        142,    "small English-only — faster, lower quality"),
     ModelSpec("base",           142,    "small multilingual"),
-    ModelSpec("small.en",       466,    "good general-purpose English (recommended)"),
+    ModelSpec("small.en",       466,    "good general-purpose English — current install default"),
     ModelSpec("small",          466,    "good general-purpose multilingual"),
     ModelSpec("medium.en",     1500,    "high-accuracy English — slower"),
     ModelSpec("medium",        1500,    "high-accuracy multilingual — slower"),

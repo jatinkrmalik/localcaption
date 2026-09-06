@@ -63,8 +63,8 @@ localcaption doctor --fix          # ~2 min on an M-series Mac
 `doctor --fix` is idempotent and end-to-end: it installs missing system
 tools (`ffmpeg`/`cmake` via `brew`/`apt`), clones + builds whisper.cpp at
 the canonical XDG location, downloads the default model, and re-runs the
-diagnostics to confirm everything works. Pick a different model with
-`--model small.en`.
+diagnostics to confirm everything works. Pick a faster model with
+`--model tiny.en`.
 
 Prefer to do it yourself? Two equivalent options:
 
@@ -75,13 +75,13 @@ curl -fsSL https://raw.githubusercontent.com/jatinkrmalik/localcaption/main/scri
 # Option B: DIY, anywhere you like:
 git clone https://github.com/ggerganov/whisper.cpp /path/to/whisper.cpp
 cd /path/to/whisper.cpp && cmake -B build && cmake --build build -j --config Release
-bash models/download-ggml-model.sh base.en
+bash models/download-ggml-model.sh small.en
 export LOCALCAPTION_WHISPER_DIR=/path/to/whisper.cpp   # add to your shell rc
 ```
 
 > 💡 The `install.sh` bootstrap is just `pipx install localcaption` followed
 > by `localcaption doctor --fix`, same logic, single source of truth.
-> Override the default model with `WHISPER_MODEL=small.en bash install.sh`.
+> Override the default model with `WHISPER_MODEL=tiny.en bash install.sh`.
 
 After install, verify everything is wired up:
 
@@ -93,7 +93,7 @@ localcaption doctor --fix          # diagnostic + auto-repair anything missing
 ### Uninstall
 
 To completely remove `localcaption` and everything it installed (the
-binary, whisper.cpp build, and ggml models (about 200 MB total):
+binary, whisper.cpp build, and ggml models (about 500 MB total):
 
 ```bash
 # pipx + whisper.cpp + models, with confirmation prompts:
@@ -104,7 +104,7 @@ bash scripts/uninstall.sh
 ```
 
 Useful flags: `--dry-run` (preview), `--yes` (skip prompts),
-`--keep-models` (uninstall the binary but keep the 200 MB whisper.cpp +
+`--keep-models` (uninstall the binary but keep the ~500 MB whisper.cpp +
 models cache for next time).
 
 Sample output:
@@ -125,7 +125,7 @@ whisper.cpp:
   searching: /Users/you/.local/share/localcaption/whisper.cpp
   ✅ directory exists
   ✅ binary built  (.../build/bin/whisper-cli)
-  ✅ models present  (ggml-base.en.bin)
+  ✅ models present  (ggml-small.en.bin)
 
 All checks passed. You're good to go: localcaption <url>
 ```
@@ -136,7 +136,7 @@ download the default model, then re-verify:
 
 ```bash
 localcaption doctor --fix                      # repair everything
-localcaption doctor --fix --model small.en     # …with a specific model
+localcaption doctor --fix --model tiny.en      # …with a faster/smaller model
 ```
 
 ### Dev install (contributors)
@@ -172,7 +172,7 @@ localcaption ./recording.wav
 
 | flag | default | what it does |
 |---|---|---|
-| `-m`, `--model` | `base.en` | whisper model name (`tiny.en`, `base.en`, `small.en`, `medium.en`, `large-v3`, …) |
+| `-m`, `--model` | `small.en` | whisper model name (`tiny.en`, `base.en`, `small.en`, `medium.en`, `large-v3`, …) |
 | `-o`, `--out` | `./transcripts` | output directory |
 | `-l`, `--language` | `auto` | ISO language code, or `auto` to let whisper detect it |
 | `--whisper-dir` | auto-detect¹ | path to a built whisper.cpp checkout |
@@ -203,9 +203,10 @@ You can also invoke it as a module: `python -m localcaption <url-or-file>`.
 
 ### Managing models
 
-`localcaption` ships with a default `base.en` model (~142 MB). For better
-quality or non-English audio, switch models with `--model <name>`. If the
-model isn't already installed, you'll be prompted to download it:
+`localcaption` defaults to `small.en` (~466 MB), downloaded by
+`doctor --fix` or on first use. For a faster run use `--model tiny.en`;
+for non-English audio, pick a multilingual model. If the model isn't
+already installed, you'll be prompted to download it:
 
 ```bash
 $ localcaption --model small.en "https://www.youtube.com/watch?v=..."
@@ -234,9 +235,9 @@ localcaption --model small.en --auto-download "https://www.youtube.com/..."
 
 | Model | Size | Best for |
 |---|---|---|
-| `tiny.en` | 75 MB | Quick drafts, English only, low-resource environments |
-| `base.en` | 142 MB | Current install default, fast & decent |
-| `small.en` | 466 MB | **Recommended for English**, great accuracy/speed balance |
+| `tiny.en` | 75 MB | Fast fallback, English only, low-resource environments |
+| `base.en` | 142 MB | Faster than `small.en`, lower accuracy |
+| `small.en` | 466 MB | **Install default**, English, accuracy/speed balance |
 | `medium.en` | 1.5 GB | High accuracy English, ~3× slower than `small.en` |
 | `large-v3` | 3.0 GB | Best accuracy, multilingual, slow |
 | `large-v3-turbo` | 1.6 GB | Near-large quality at ~half the size, great compromise |
@@ -253,7 +254,7 @@ result = transcribe_url(
     "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
     out_dir=Path("transcripts"),
     whisper_dir=Path("whisper.cpp"),
-    model="base.en",
+    model="small.en",
 )
 print(result.transcripts.txt.read_text())
 ```
@@ -294,9 +295,11 @@ the subprocess hops to yt-dlp, ffmpeg, and whisper.cpp. The intermediate
 ## Benchmarks
 
 Wall-clock times for the **complete** pipeline (yt-dlp download → ffmpeg
-re-encode → whisper.cpp transcription), measured with the default `base.en`
-model. Numbers will vary with your network speed and CPU/GPU; treat them as
-order-of-magnitude reference, not a competitive benchmark.
+re-encode → whisper.cpp transcription), measured with `base.en` (the
+previous default). These have **not** been re-run on `small.en`; expect
+transcription to take longer. Numbers will vary with your network speed
+and CPU/GPU; treat them as order-of-magnitude reference, not a
+competitive benchmark.
 
 | Video | Length | Wall-clock | Speed vs. realtime | Hardware |
 |---|---|---|---|---|
@@ -309,15 +312,16 @@ order-of-magnitude reference, not a competitive benchmark.
 
 ```bash
 # Apple Silicon, macOS, whisper.cpp built with Metal,
-# model: ggml-base.en, language: auto, no other heavy processes.
+# model: ggml-base.en (matches the table above; not the current default),
+# language: auto, no other heavy processes.
 
-time localcaption --no-print -o /tmp/lc-bench-1 \
+time localcaption --model base.en --no-print -o /tmp/lc-bench-1 \
   "https://www.youtube.com/watch?v=PSRJfaAYkW4"
 
-time localcaption --no-print -o /tmp/lc-bench-2 \
+time localcaption --model base.en --no-print -o /tmp/lc-bench-2 \
   "https://www.youtube.com/watch?v=aircAruvnKk"
 
-time localcaption --no-print -o /tmp/lc-bench-3 \
+time localcaption --model base.en --no-print -o /tmp/lc-bench-3 \
   "https://www.youtube.com/watch?v=BYizgB2FcAQ"
 ```
 
@@ -328,8 +332,8 @@ hardware in the **Hardware** column.
 
 ## Notes
 
-- Bigger models = better quality but slower. `base.en` is a good default;
-  try `small.en` if you have the patience and `tiny.en` for instant results.
+- Bigger models = better quality but slower. `small.en` is the default;
+  use `--model tiny.en` when you want speed over accuracy.
 - Apple Silicon: whisper.cpp's CMake build uses Metal automatically, you'll
   see `ggml_metal_init` in the logs.
 - The pipeline accepts any URL `yt-dlp` supports (Vimeo, Twitch VODs, Twitter/X,
@@ -356,7 +360,7 @@ criteria, and discussion):
 | [#4](https://github.com/jatinkrmalik/localcaption/issues/4) | Speaker diarization with pyannote.audio (`--diarize`) | `stretch`, `help wanted` |
 | [#5](https://github.com/jatinkrmalik/localcaption/issues/5) | YouTube chapters & grep-able search index | `enhancement` |
 | [#6](https://github.com/jatinkrmalik/localcaption/issues/6) | Pluggable transcription backends (faster-whisper / MLX) | `help wanted` |
-| ~~[#1](https://github.com/jatinkrmalik/localcaption/issues/1)~~ | ~~Switch default model from `base.en` to `small.en`~~ | _superseded by #7_ |
+| [#1](https://github.com/jatinkrmalik/localcaption/issues/1) | Switch default model from `base.en` to `small.en` | _unreleased_ ✅ |
 
 **Have an idea?** Open a
 [feature request](https://github.com/jatinkrmalik/localcaption/issues/new/choose),

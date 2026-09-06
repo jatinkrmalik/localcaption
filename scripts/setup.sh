@@ -8,7 +8,7 @@
 # Re-runnable: skips steps that are already done.
 #
 # Env vars:
-#   WHISPER_MODEL   default: base.en   (tiny.en | base.en | small.en | medium.en | large-v3)
+#   WHISPER_MODEL   default: small.en  (tiny.en | base.en | small.en | medium.en | large-v3)
 #   EXTRAS          default: dev       (dev | "" )
 
 set -euo pipefail
@@ -16,7 +16,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WHISPER_DIR="${REPO_ROOT}/whisper.cpp"
 VENV_DIR="${REPO_ROOT}/.venv"
-MODEL="${WHISPER_MODEL:-base.en}"
+MODEL="${WHISPER_MODEL:-small.en}"
 EXTRAS="${EXTRAS:-dev}"
 
 log()  { printf "\033[1;34m[setup]\033[0m %s\n" "$*"; }

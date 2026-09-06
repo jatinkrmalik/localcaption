@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Default whisper model is now `small.en` instead of `base.en`. Better
+  accuracy on accents and proper nouns; `tiny.en` remains the fast
+  fallback via `--model tiny.en`. Installer, `setup.sh`, and
+  `doctor --fix` follow the same default.
+
 ## [0.3.0] - 2026-08-16
 
 ### Added

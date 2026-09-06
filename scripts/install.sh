@@ -15,13 +15,13 @@
 #   ./scripts/install.sh
 #
 # Env vars:
-#   WHISPER_MODEL              default: base.en
+#   WHISPER_MODEL              default: small.en
 #   LOCALCAPTION_PACKAGE_SPEC  default: localcaption  (override with a local path or git URL)
 #   PREFIX_DATA                default: $XDG_DATA_HOME or $HOME/.local/share
 
 set -euo pipefail
 
-MODEL="${WHISPER_MODEL:-base.en}"
+MODEL="${WHISPER_MODEL:-small.en}"
 PKG_SPEC="${LOCALCAPTION_PACKAGE_SPEC:-localcaption}"
 DATA_DIR="${PREFIX_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}}/localcaption"
 WHISPER_DIR="${DATA_DIR}/whisper.cpp"
