@@ -213,7 +213,12 @@ def _normalize_local_source(source: str, base: Path) -> str:
 
 def _safe_id(raw: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", raw).strip("._")
-    return cleaned[:120] if cleaned else "video"
+    if not cleaned:
+        return "video"
+    if len(cleaned) <= 120:
+        return cleaned
+    # Keep the tail so long macOS temp prefixes do not drop the filename.
+    return cleaned[-120:].lstrip("._") or "video"
 
 
 def _format_error(exc: BaseException) -> str:
