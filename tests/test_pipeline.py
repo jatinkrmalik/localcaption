@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from localcaption.pipeline import PipelineResult, _is_local_file, transcribe_url
+from localcaption.whisper import BACKEND_FASTER_WHISPER, DEFAULT_BACKEND
 
 
 class TestIsLocalFile:
@@ -60,7 +61,7 @@ class TestTranscribeUrlLocalFile:
         fake_transcripts = MagicMock()
         fake_transcripts.existing.return_value = {}
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             return fake_transcripts
 
         monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
@@ -94,7 +95,7 @@ class TestTranscribeUrlLocalFile:
             dst.write_text("fake wav")
             return dst
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             captured["out_base"] = out_base
             fake_transcripts = MagicMock()
             fake_transcripts.existing.return_value = {}
@@ -132,7 +133,7 @@ class TestTranscribeUrlLocalFile:
         fake_transcripts = MagicMock()
         fake_transcripts.existing.return_value = {}
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             return fake_transcripts
 
         monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
@@ -164,7 +165,7 @@ class TestTranscribeUrlLocalFile:
         fake_transcripts = MagicMock()
         fake_transcripts.existing.return_value = {}
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             return fake_transcripts
 
         monkeypatch.setattr("localcaption.pipeline.to_whisper_wav", fake_to_whisper_wav)
@@ -197,7 +198,7 @@ class TestTranscribeUrlLocalFile:
         fake_transcripts = MagicMock()
         fake_transcripts.existing.return_value = {}
 
-        def fake_transcribe(wav, model, out_base, *, whisper_dir, language):
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
             return fake_transcripts
 
         monkeypatch.setattr("localcaption.pipeline.to_whisper_wav", fake_to_whisper_wav)
@@ -213,3 +214,29 @@ class TestTranscribeUrlLocalFile:
 
         assert result.audio_path is None
         assert result.wav_path is None
+
+    def test_forwards_backend(self, monkeypatch, tmp_path: Path) -> None:
+        video = tmp_path / "clip.mp4"
+        video.write_text("fake")
+        captured: dict = {}
+
+        def fake_to_whisper_wav(src, dst):
+            dst.write_text("fake wav")
+            return dst
+
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
+            captured["backend"] = kwargs.get("backend", DEFAULT_BACKEND)
+            fake_transcripts = MagicMock()
+            fake_transcripts.existing.return_value = {}
+            return fake_transcripts
+
+        monkeypatch.setattr("localcaption.pipeline.to_whisper_wav", fake_to_whisper_wav)
+        monkeypatch.setattr("localcaption.pipeline.transcribe", fake_transcribe)
+
+        transcribe_url(
+            str(video),
+            out_dir=tmp_path / "out",
+            whisper_dir=tmp_path / "whisper.cpp",
+            backend=BACKEND_FASTER_WHISPER,
+        )
+        assert captured["backend"] == BACKEND_FASTER_WHISPER

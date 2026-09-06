@@ -24,7 +24,7 @@ class AudioConversionError(LocalCaptionError):
 
 
 class TranscriptionError(LocalCaptionError):
-    """whisper.cpp failed to produce a transcript."""
+    """A transcription backend failed to produce a transcript."""
 
 
 class InstallError(LocalCaptionError):

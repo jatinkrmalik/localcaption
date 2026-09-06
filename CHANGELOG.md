@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Pluggable transcription backends. `whisper.cpp` stays the default;
+  `faster-whisper` is available via `pip install localcaption[faster]`.
+  Select with `--backend {whisper-cpp,faster-whisper}` or
+  `$LOCALCAPTION_BACKEND`.
+
 ## [0.3.0] - 2026-08-16
 
 ### Added

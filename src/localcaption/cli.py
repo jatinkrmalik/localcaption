@@ -20,7 +20,13 @@ from . import __version__
 from . import _logging as log
 from .errors import LocalCaptionError
 from .pipeline import transcribe_url
-from .whisper import DEFAULT_MODEL, WhisperPaths
+from .whisper import (
+    BACKEND_NAMES,
+    BACKEND_WHISPER_CPP,
+    DEFAULT_MODEL,
+    WhisperPaths,
+    resolve_backend_name,
+)
 
 # Subcommands recognised by the dispatcher. Anything else is treated as a URL
 # and routed to the implicit "transcribe" command for backwards compatibility.
@@ -69,7 +75,7 @@ def _default_whisper_dir() -> Path:
 def _build_transcribe_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="localcaption",
-        description="Fully-local video → transcript using yt-dlp + ffmpeg + whisper.cpp.",
+        description="Fully-local video → transcript using yt-dlp + ffmpeg + a local whisper backend.",
     )
     parser.add_argument(
         "url",
@@ -88,9 +94,15 @@ def _build_transcribe_parser() -> argparse.ArgumentParser:
         help="ISO language code, or 'auto' (default: auto)",
     )
     parser.add_argument(
+        "--backend",
+        choices=BACKEND_NAMES,
+        default=None,
+        help="transcription backend (default: whisper-cpp, or $LOCALCAPTION_BACKEND)",
+    )
+    parser.add_argument(
         "--whisper-dir", type=Path, default=None,
         help="path to a built whisper.cpp checkout "
-             "(default: $LOCALCAPTION_WHISPER_DIR, ./whisper.cpp, "
+             "(whisper-cpp backend; default: $LOCALCAPTION_WHISPER_DIR, ./whisper.cpp, "
              "or ~/.local/share/localcaption/whisper.cpp)",
     )
     parser.add_argument(
@@ -170,12 +182,20 @@ def _ensure_model_available(model: str, whisper_dir: Path, auto: bool) -> bool:
 
 def _cmd_transcribe(argv: list[str]) -> int:
     args = _build_transcribe_parser().parse_args(argv)
+    try:
+        backend = resolve_backend_name(args.backend)
+    except LocalCaptionError as exc:
+        log.error(str(exc))
+        return 1
+
     whisper_dir = args.whisper_dir or _default_whisper_dir()
 
-    # Pre-flight: ensure the requested model is on disk before doing the (slow)
-    # download+ffmpeg dance. Cheap if already installed, helpful if not.
-    if whisper_dir.is_dir() and not _ensure_model_available(
-        args.model, whisper_dir, args.auto_download
+    # Pre-flight ggml models only for whisper.cpp. faster-whisper fetches its
+    # own CTranslate2 weights on first use.
+    if (
+        backend == BACKEND_WHISPER_CPP
+        and whisper_dir.is_dir()
+        and not _ensure_model_available(args.model, whisper_dir, args.auto_download)
     ):
         return 1
 
@@ -187,6 +207,7 @@ def _cmd_transcribe(argv: list[str]) -> int:
             model=args.model,
             language=args.language,
             keep_intermediate=args.keep_audio,
+            backend=backend,
         )
     except LocalCaptionError as exc:
         log.error(str(exc))

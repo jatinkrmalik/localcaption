@@ -28,7 +28,8 @@ src/localcaption/
 ├── download.py        # yt-dlp Python API wrapper (stage 1)
 ├── errors.py          # exception hierarchy
 ├── pipeline.py        # public Python API: transcribe_url(...)
-└── whisper.py         # whisper.cpp invocation (stage 3)
+├── whisper.py         # Backend protocol + transcribe() dispatcher
+└── backends/          # whisper.cpp (default) and faster-whisper
 scripts/
 └── setup.sh           # bootstraps whisper.cpp + venv + model
 tests/                 # pytest suite

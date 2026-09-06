@@ -1,22 +1,24 @@
-"""Stage 3: run whisper.cpp against a 16 kHz mono WAV.
+"""Stage 3: transcribe a 16 kHz mono WAV via a pluggable backend.
 
-The whisper.cpp checkout is treated as an external dependency installed by
-``scripts/setup.sh``. We auto-detect the binary because the project moved
-its executable around historically (``main`` → ``build/bin/main`` →
-``build/bin/whisper-cli``).
+The default backend is whisper.cpp. Alternative backends live in
+``localcaption.backends`` and are selected with ``--backend`` /
+``$LOCALCAPTION_BACKEND``.
 """
 
 from __future__ import annotations
 
 import os
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
-from . import _logging as log
-from .errors import DependencyError, TranscriptionError
+from .errors import DependencyError
 
 DEFAULT_MODEL = "base.en"
+BACKEND_WHISPER_CPP = "whisper-cpp"
+BACKEND_FASTER_WHISPER = "faster-whisper"
+DEFAULT_BACKEND = BACKEND_WHISPER_CPP
+BACKEND_NAMES = (BACKEND_WHISPER_CPP, BACKEND_FASTER_WHISPER)
 SUPPORTED_OUTPUT_FORMATS = ("txt", "srt", "vtt", "json")
 
 
@@ -49,7 +51,7 @@ class WhisperPaths:
 
 @dataclass(frozen=True)
 class TranscriptionResult:
-    """Paths to the artefacts emitted by whisper.cpp."""
+    """Paths to the artefacts emitted by a transcription backend."""
     txt: Path
     srt: Path
     vtt: Path
@@ -60,6 +62,57 @@ class TranscriptionResult:
         return {k: v for k, v in vars(self).items() if isinstance(v, Path) and v.exists()}
 
 
+class Backend(Protocol):
+    """A transcription backend turns a WAV file into transcript artefacts."""
+
+    def transcribe(
+        self,
+        wav: Path,
+        model: str,
+        out_basename: Path,
+        *,
+        language: str = "auto",
+    ) -> TranscriptionResult: ...
+
+
+def resolve_backend_name(cli_value: str | None = None) -> str:
+    """Return the backend name from an explicit value, env, or the default.
+
+    Precedence: *cli_value* (if given) > ``$LOCALCAPTION_BACKEND`` > whisper-cpp.
+    """
+    if cli_value:
+        name = cli_value.strip()
+    else:
+        name = os.environ.get("LOCALCAPTION_BACKEND", "").strip() or DEFAULT_BACKEND
+    if name not in BACKEND_NAMES:
+        raise DependencyError(
+            f"Unknown transcription backend {name!r}. "
+            f"Choose from: {', '.join(BACKEND_NAMES)}"
+        )
+    return name
+
+
+def get_backend(name: str, *, whisper_dir: Path | None = None) -> Backend:
+    """Instantiate a backend by name."""
+    if name == BACKEND_WHISPER_CPP:
+        if whisper_dir is None:
+            raise DependencyError(
+                "whisper-cpp backend requires a whisper.cpp directory "
+                "(pass --whisper-dir or set LOCALCAPTION_WHISPER_DIR)"
+            )
+        from .backends.whisper_cpp import WhisperCppBackend
+
+        return WhisperCppBackend(whisper_dir)
+    if name == BACKEND_FASTER_WHISPER:
+        from .backends.faster_whisper import FasterWhisperBackend
+
+        return FasterWhisperBackend()
+    raise DependencyError(
+        f"Unknown transcription backend {name!r}. "
+        f"Choose from: {', '.join(BACKEND_NAMES)}"
+    )
+
+
 def transcribe(
     wav: Path,
     model: str,
@@ -67,37 +120,17 @@ def transcribe(
     *,
     whisper_dir: Path,
     language: str = "auto",
+    backend: str | Backend = DEFAULT_BACKEND,
 ) -> TranscriptionResult:
-    """Run whisper.cpp on *wav* and emit transcripts at *out_basename*.{txt,srt,vtt,json}."""
-    paths = WhisperPaths(whisper_dir)
-    binary = paths.find_binary()
-    model_path = paths.model_file(model)
-    if not model_path.is_file():
-        raise DependencyError(
-            f"Model file missing: {model_path}\n"
-            f"Download it with: bash {paths.models_dir}/download-ggml-model.sh {model}"
-        )
+    """Transcribe *wav* and emit artefacts at *out_basename*.{txt,srt,vtt,json}.
 
-    out_basename.parent.mkdir(parents=True, exist_ok=True)
-    cmd = [
-        str(binary),
-        "-m", str(model_path),
-        "-f", str(wav),
-        "-of", str(out_basename),
-        "-otxt", "-osrt", "-ovtt", "-oj",
-        "-l", language,
-    ]
-    log.info(f"whisper.cpp: model={model} language={language}")
-    try:
-        subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError as exc:
-        raise TranscriptionError(
-            f"whisper.cpp failed (exit {exc.returncode}) on {wav}"
-        ) from exc
-
-    return TranscriptionResult(
-        txt=out_basename.with_suffix(".txt"),
-        srt=out_basename.with_suffix(".srt"),
-        vtt=out_basename.with_suffix(".vtt"),
-        json=out_basename.with_suffix(".json"),
+    *backend* is a backend name (``whisper-cpp``, ``faster-whisper``) or an
+    object matching :class:`Backend`. ``whisper_dir`` is required for the
+    whisper.cpp backend and ignored otherwise.
+    """
+    impl: Backend = (
+        backend
+        if not isinstance(backend, str)
+        else get_backend(backend, whisper_dir=whisper_dir)
     )
+    return impl.transcribe(wav, model, out_basename, language=language)

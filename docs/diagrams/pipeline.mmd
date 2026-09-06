@@ -26,7 +26,7 @@ flowchart LR
 
     subgraph S3["Stage 3 · Transcribe"]
         direction LR
-        WCPP(["whisper.cpp<br/><i>Metal · CUDA · CPU</i>"]):::tool
+        WCPP(["whisper.cpp · faster-whisper<br/><i>pluggable backend</i>"]):::tool
         OUT[/"📝 transcript<br/>.txt · .srt · .vtt · .json"/]:::output
     end
 

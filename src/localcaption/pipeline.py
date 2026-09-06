@@ -13,7 +13,7 @@ from pathlib import Path
 from . import _logging as log
 from .audio import to_whisper_wav
 from .download import download_audio
-from .whisper import DEFAULT_MODEL, TranscriptionResult, transcribe
+from .whisper import DEFAULT_BACKEND, DEFAULT_MODEL, Backend, TranscriptionResult, transcribe
 
 
 @dataclass(frozen=True)
@@ -39,6 +39,7 @@ def transcribe_url(
     model: str = DEFAULT_MODEL,
     language: str = "auto",
     keep_intermediate: bool = False,
+    backend: str | Backend = DEFAULT_BACKEND,
 ) -> PipelineResult:
     """Run the full pipeline on *url* and return the produced artefacts.
 
@@ -52,12 +53,15 @@ def transcribe_url(
         Directory for the final transcript files.
     whisper_dir:
         Path to the whisper.cpp checkout (built and with a ggml model present).
+        Required for the whisper-cpp backend; ignored by faster-whisper.
     model:
-        whisper.cpp model name (e.g. ``base.en``, ``small.en``, ``large-v3``).
+        Model name (e.g. ``base.en``, ``small.en``, ``large-v3``).
     language:
         ISO language code or ``"auto"`` to let whisper detect it.
     keep_intermediate:
         If True, leave the downloaded audio + 16 kHz WAV in ``out_dir/.work``.
+    backend:
+        Backend name (``whisper-cpp``, ``faster-whisper``) or a :class:`Backend`.
     """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -75,7 +79,12 @@ def transcribe_url(
 
         out_base = out_dir / audio_path.stem
         transcripts = transcribe(
-            wav_path, model, out_base, whisper_dir=whisper_dir, language=language
+            wav_path,
+            model,
+            out_base,
+            whisper_dir=whisper_dir,
+            language=language,
+            backend=backend,
         )
     finally:
         if not keep_intermediate:

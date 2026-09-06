@@ -26,7 +26,7 @@
 |---|---|
 | Download best audio | [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) (YouTube, Vimeo, Twitch, 1000+ sites) |
 | Re-encode to 16 kHz mono WAV | [`ffmpeg`](https://ffmpeg.org/) |
-| Transcribe locally | [`whisper.cpp`](https://github.com/ggerganov/whisper.cpp) |
+| Transcribe locally | [`whisper.cpp`](https://github.com/ggerganov/whisper.cpp) (default) or [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) |
 
 Nothing is uploaded to a third-party service. No OpenAI / Google / DeepL keys
 required. Runs happily on a laptop.
@@ -175,7 +175,8 @@ localcaption ./recording.wav
 | `-m`, `--model` | `base.en` | whisper model name (`tiny.en`, `base.en`, `small.en`, `medium.en`, `large-v3`, …) |
 | `-o`, `--out` | `./transcripts` | output directory |
 | `-l`, `--language` | `auto` | ISO language code, or `auto` to let whisper detect it |
-| `--whisper-dir` | auto-detect¹ | path to a built whisper.cpp checkout |
+| `--backend` | `whisper-cpp` | transcription backend: `whisper-cpp` or `faster-whisper`. `$LOCALCAPTION_BACKEND` if the flag is omitted |
+| `--whisper-dir` | auto-detect¹ | path to a built whisper.cpp checkout (whisper-cpp backend) |
 | `--keep-audio` | off | keep the downloaded audio + intermediate WAV in `<out>/.work/` |
 | `--no-print` | off | don't echo the transcript to stdout |
 
@@ -188,6 +189,26 @@ localcaption ./recording.wav
 Outputs `<videoId>.txt`, `.srt`, `.vtt`, and `.json` in the chosen directory. For local files, the output filename is derived from the input file's name.
 
 You can also invoke it as a module: `python -m localcaption <url-or-file>`.
+
+### faster-whisper (optional)
+
+`whisper.cpp` is the default backend and needs no extra Python packages.
+To use [faster-whisper](https://github.com/SYSTRAN/faster-whisper) instead
+(CTranslate2, typically faster on CPU/CUDA, including Windows):
+
+```bash
+pip install 'localcaption[faster]'
+# pipx:
+pipx inject localcaption faster-whisper
+
+localcaption --backend faster-whisper "https://www.youtube.com/watch?v=..."
+# or:
+export LOCALCAPTION_BACKEND=faster-whisper
+```
+
+faster-whisper downloads its own CTranslate2 weights on first use; it does
+not read ggml files from `--whisper-dir`. `--model` names (`base.en`,
+`small.en`, `large-v3`, ...) match the usual Whisper sizes.
 
 ### Subcommands
 
@@ -254,6 +275,7 @@ result = transcribe_url(
     out_dir=Path("transcripts"),
     whisper_dir=Path("whisper.cpp"),
     model="base.en",
+    backend="whisper-cpp",  # or "faster-whisper"
 )
 print(result.transcripts.txt.read_text())
 ```
@@ -262,8 +284,9 @@ print(result.transcripts.txt.read_text())
 
 `localcaption` is intentionally tiny: an orchestrator (`pipeline.py`) drives
 three single-responsibility stages, each wrapping one external tool. The
-modules are split this way so that a contributor can swap, say, `whisper.cpp`
-for `faster-whisper` without touching `download.py` or `audio.py`.
+transcribe stage is a small `Backend` protocol; `whisper.cpp` is the default
+implementation and `faster-whisper` is an optional extra. Swapping backends
+does not touch `download.py` or `audio.py`.
 
 ### Module map
 
@@ -273,7 +296,7 @@ for `faster-whisper` without touching `download.py` or `audio.py`.
 |---|---|---|
 | Entry points | `cli.py`, `__main__.py` | argparse, exit codes, stdout formatting |
 | Orchestration | `pipeline.py` | public Python API: `transcribe_url(...)` |
-| Pipeline stages | `download.py`, `audio.py`, `whisper.py` | one external tool each |
+| Pipeline stages | `download.py`, `audio.py`, `whisper.py`, `backends/` | download, re-encode, transcribe (pluggable) |
 | Support | `errors.py`, `_logging.py` | exception hierarchy, tiny logger |
 
 ### Runtime sequence
