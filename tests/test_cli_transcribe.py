@@ -17,6 +17,7 @@ class TestCliHelpText:
         out = capsys.readouterr().out
         assert "local video/audio file" in out
         assert "default: small.en" in out
+        assert "--batch" in out
 
     def test_top_level_help_mentions_url_or_file(self, capsys) -> None:
         rc = main([])
@@ -74,3 +75,67 @@ class TestCliLocalFileDispatch:
             main(["./relative.mp4"])
         assert sentinel["url"] == "./relative.mp4"
         assert sentinel["model"] == "small.en"
+
+
+class TestCliBatch:
+    def test_batch_flag_dispatches_parsed_urls(self, monkeypatch, tmp_path: Path, capsys) -> None:
+        listing = tmp_path / "urls.txt"
+        listing.write_text(
+            "# queue\n"
+            "https://www.youtube.com/watch?v=aircAruvnKk\n"
+            "\n"
+            "https://youtu.be/PSRJfaAYkW4\n",
+            encoding="utf-8",
+        )
+        sentinel: dict[str, object] = {}
+
+        def fake_transcribe_urls(urls, **kw):
+            sentinel["urls"] = urls
+            sentinel["out_dir"] = kw["out_dir"]
+            sentinel["model"] = kw["model"]
+            from localcaption.batch import BatchResult
+
+            return BatchResult(items=[], wall_clock_s=0.0)
+
+        monkeypatch.setattr("localcaption.cli.transcribe_urls", fake_transcribe_urls)
+        out = tmp_path / "transcripts"
+        whisper = tmp_path / "missing-whisper"  # not a dir → skip model prompt
+        rc = main(
+            [
+                "--batch",
+                str(listing),
+                "-o",
+                str(out),
+                "-m",
+                "small.en",
+                "--whisper-dir",
+                str(whisper),
+            ]
+        )
+        assert rc == 0
+        assert sentinel["urls"] == [
+            "https://www.youtube.com/watch?v=aircAruvnKk",
+            "https://youtu.be/PSRJfaAYkW4",
+        ]
+        assert sentinel["out_dir"] == out
+        assert sentinel["model"] == "small.en"
+        assert "total: 0" in capsys.readouterr().out
+
+    def test_batch_missing_file_exits_1(self, tmp_path: Path) -> None:
+        rc = main(
+            [
+                "--batch",
+                str(tmp_path / "nope.txt"),
+                "--whisper-dir",
+                str(tmp_path / "missing-whisper"),
+            ]
+        )
+        assert rc == 1
+
+    def test_batch_and_url_rejected(self, tmp_path: Path) -> None:
+        listing = tmp_path / "urls.txt"
+        listing.write_text("https://youtu.be/PSRJfaAYkW4\n", encoding="utf-8")
+        with pytest.raises(SystemExit) as excinfo:
+            main(["https://youtu.be/PSRJfaAYkW4", "--batch", str(listing)])
+        assert excinfo.value.code == 2
+

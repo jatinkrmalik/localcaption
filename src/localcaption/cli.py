@@ -5,6 +5,7 @@ Exposed as the ``localcaption`` console script via ``pyproject.toml``.
 Two invocation styles are supported:
 
     localcaption <url-or-file> [options]   # one-shot transcription (default)
+    localcaption --batch FILE [options]    # sequential list of URLs/files
     localcaption doctor                    # diagnose your install
 """
 
@@ -18,6 +19,7 @@ from pathlib import Path
 
 from . import __version__
 from . import _logging as log
+from .batch import read_url_list, transcribe_urls
 from .errors import LocalCaptionError
 from .pipeline import transcribe_url
 from .whisper import DEFAULT_MODEL, WhisperPaths
@@ -73,7 +75,14 @@ def _build_transcribe_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "url",
+        nargs="?",
         help="YouTube URL, any URL yt-dlp supports, or path to a local video/audio file",
+    )
+    parser.add_argument(
+        "--batch",
+        type=Path,
+        metavar="FILE",
+        help="transcribe every non-empty, non-# line in FILE sequentially",
     )
     parser.add_argument(
         "-m", "--model", default=DEFAULT_MODEL,
@@ -169,7 +178,11 @@ def _ensure_model_available(model: str, whisper_dir: Path, auto: bool) -> bool:
 
 
 def _cmd_transcribe(argv: list[str]) -> int:
-    args = _build_transcribe_parser().parse_args(argv)
+    parser = _build_transcribe_parser()
+    args = parser.parse_args(argv)
+    if (args.batch is not None) == bool(args.url):
+        parser.error("provide a URL/file or --batch FILE, not both")
+
     whisper_dir = args.whisper_dir or _default_whisper_dir()
 
     # Pre-flight: ensure the requested model is on disk before doing the (slow)
@@ -179,6 +192,12 @@ def _cmd_transcribe(argv: list[str]) -> int:
     ):
         return 1
 
+    if args.batch:
+        return _run_batch(args, whisper_dir)
+    return _run_one(args, whisper_dir)
+
+
+def _run_one(args: argparse.Namespace, whisper_dir: Path) -> int:
     try:
         result = transcribe_url(
             args.url,
@@ -203,6 +222,30 @@ def _cmd_transcribe(argv: list[str]) -> int:
             print(txt.read_text(encoding="utf-8", errors="replace"))
 
     return 0
+
+
+def _run_batch(args: argparse.Namespace, whisper_dir: Path) -> int:
+    if not args.batch.is_file():
+        log.error(f"batch file not found: {args.batch}")
+        return 1
+    try:
+        urls = read_url_list(args.batch)
+    except OSError as exc:
+        log.error(f"cannot read batch file: {exc}")
+        return 1
+    if not urls:
+        log.warn(f"no URLs in {args.batch}")
+
+    result = transcribe_urls(
+        urls,
+        out_dir=args.out,
+        whisper_dir=whisper_dir,
+        model=args.model,
+        language=args.language,
+        keep_intermediate=args.keep_audio,
+    )
+    print(result.summary())
+    return result.exit_code()
 
 
 # --- doctor subcommand ---------------------------------------------------
@@ -632,6 +675,7 @@ def _cmd_model_rm(argv: list[str]) -> int:
 def _print_top_level_help() -> None:
     print("""\
 usage: localcaption <url-or-file> [options]    transcribe a video (default)
+       localcaption --batch FILE [options]     transcribe a list of URLs/files
        localcaption doctor                     diagnose your install
        localcaption model <subcommand>         list / download / remove models
        localcaption --help                     show transcribe help
