@@ -24,6 +24,7 @@ src/localcaption/
 ├── __main__.py        # python -m localcaption
 ├── _logging.py        # tiny stdout logger (no logging-module config)
 ├── audio.py           # ffmpeg → 16 kHz mono WAV (stage 2)
+├── batch.py           # public Python API: transcribe_urls(...)
 ├── cli.py             # argparse entry point (the `localcaption` script)
 ├── download.py        # yt-dlp Python API wrapper (stage 1)
 ├── errors.py          # exception hierarchy

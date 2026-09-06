@@ -117,6 +117,35 @@ class TestTranscribeUrlLocalFile:
 
         assert captured["out_base"] == out_dir / "interview"
 
+    def test_explicit_stem_overrides_filename(self, monkeypatch, tmp_path: Path) -> None:
+        video = tmp_path / "interview.mkv"
+        video.write_text("fake video")
+        out_dir = tmp_path / "out"
+        captured: dict[str, Path] = {}
+
+        def fake_to_whisper_wav(src, dst):
+            dst.write_text("fake wav")
+            return dst
+
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
+            captured["out_base"] = out_base
+            fake_transcripts = MagicMock()
+            fake_transcripts.existing.return_value = {}
+            return fake_transcripts
+
+        monkeypatch.setattr("localcaption.pipeline.to_whisper_wav", fake_to_whisper_wav)
+        monkeypatch.setattr("localcaption.pipeline.transcribe", fake_transcribe)
+
+        transcribe_url(
+            str(video),
+            out_dir=out_dir,
+            whisper_dir=tmp_path / "whisper.cpp",
+            model="base.en",
+            stem="custom_id",
+        )
+
+        assert captured["out_base"] == out_dir / "custom_id"
+
     def test_url_still_calls_download(
         self, monkeypatch, tmp_path: Path
     ) -> None:

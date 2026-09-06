@@ -12,6 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `faster-whisper` is available via `pip install localcaption[faster]`.
   Select with `--backend {whisper-cpp,faster-whisper}` or
   `$LOCALCAPTION_BACKEND`. `whisper_dir` is only required for whisper.cpp.
+- **Batch mode.** `localcaption --batch urls.txt` transcribes each non-empty,
+  non-`#` line sequentially (URLs or local files). Output goes to
+  `<out>/<videoId>/` so items cannot clobber each other; if
+  `<videoId>/<videoId>.txt` already exists the item is skipped. A summary
+  table is printed at the end. Exit 0 if every item succeeded or was
+  skipped, 1 if any failed. Python helper: `localcaption.batch.transcribe_urls`.
+
+### Changed
+- Default whisper model is now `small.en` instead of `base.en`. Better
+  accuracy on accents and proper nouns; `tiny.en` remains the fast
+  fallback via `--model tiny.en`. Installer, `setup.sh`, and
+  `doctor --fix` follow the same default.
 
 ## [0.3.0] - 2026-08-16
 

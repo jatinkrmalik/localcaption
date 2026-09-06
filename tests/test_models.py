@@ -54,6 +54,11 @@ def test_english_only_flag():
     assert not models.get_model("base").is_english_only
 
 
+def test_small_en_is_marked_install_default():
+    assert "default" in models.get_model("small.en").description.lower()
+    assert "default" not in models.get_model("base.en").description.lower()
+
+
 # ──────────────────────────────────────────────────────────────────────
 # Disk introspection
 # ──────────────────────────────────────────────────────────────────────

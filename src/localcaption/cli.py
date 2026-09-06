@@ -5,6 +5,7 @@ Exposed as the ``localcaption`` console script via ``pyproject.toml``.
 Two invocation styles are supported:
 
     localcaption <url-or-file> [options]   # one-shot transcription (default)
+    localcaption --batch FILE [options]    # sequential list of URLs/files
     localcaption doctor                    # diagnose your install
 """
 
@@ -18,6 +19,7 @@ from pathlib import Path
 
 from . import __version__
 from . import _logging as log
+from .batch import read_url_list, transcribe_urls
 from .errors import LocalCaptionError
 from .pipeline import transcribe_url
 from .whisper import (
@@ -25,6 +27,7 @@ from .whisper import (
     BACKEND_WHISPER_CPP,
     DEFAULT_MODEL,
     WhisperPaths,
+    get_backend,
     resolve_backend_name,
 )
 
@@ -79,7 +82,14 @@ def _build_transcribe_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "url",
+        nargs="?",
         help="YouTube URL, any URL yt-dlp supports, or path to a local video/audio file",
+    )
+    parser.add_argument(
+        "--batch",
+        type=Path,
+        metavar="FILE",
+        help="transcribe every non-empty, non-# line in FILE sequentially",
     )
     parser.add_argument(
         "-m", "--model", default=DEFAULT_MODEL,
@@ -181,7 +191,15 @@ def _ensure_model_available(model: str, whisper_dir: Path, auto: bool) -> bool:
 
 
 def _cmd_transcribe(argv: list[str]) -> int:
-    args = _build_transcribe_parser().parse_args(argv)
+    parser = _build_transcribe_parser()
+    args = parser.parse_args(argv)
+    has_batch = args.batch is not None
+    has_url = bool(args.url)
+    if has_batch == has_url:
+        parser.error(
+            "provide a URL/file or --batch FILE" + (", not both" if has_batch else "")
+        )
+
     try:
         backend = resolve_backend_name(args.backend)
     except LocalCaptionError as exc:
@@ -189,6 +207,11 @@ def _cmd_transcribe(argv: list[str]) -> int:
         return 1
 
     whisper_dir = args.whisper_dir or _default_whisper_dir()
+    try:
+        get_backend(backend, whisper_dir=whisper_dir)
+    except LocalCaptionError as exc:
+        log.error(str(exc))
+        return 1
 
     # Pre-flight ggml models only for whisper.cpp. faster-whisper fetches its
     # own CTranslate2 weights on first use.
@@ -199,6 +222,12 @@ def _cmd_transcribe(argv: list[str]) -> int:
     ):
         return 1
 
+    if args.batch:
+        return _run_batch(args, whisper_dir, backend)
+    return _run_one(args, whisper_dir, backend)
+
+
+def _run_one(args: argparse.Namespace, whisper_dir: Path, backend: str) -> int:
     try:
         result = transcribe_url(
             args.url,
@@ -224,6 +253,31 @@ def _cmd_transcribe(argv: list[str]) -> int:
             print(txt.read_text(encoding="utf-8", errors="replace"))
 
     return 0
+
+
+def _run_batch(args: argparse.Namespace, whisper_dir: Path, backend: str) -> int:
+    if not args.batch.is_file():
+        log.error(f"batch file not found: {args.batch}")
+        return 1
+    try:
+        urls = read_url_list(args.batch)
+    except OSError as exc:
+        log.error(f"cannot read batch file: {exc}")
+        return 1
+    if not urls:
+        log.warn(f"no URLs in {args.batch}")
+
+    result = transcribe_urls(
+        urls,
+        out_dir=args.out,
+        whisper_dir=whisper_dir,
+        model=args.model,
+        language=args.language,
+        keep_intermediate=args.keep_audio,
+        backend=backend,
+    )
+    print(result.summary())
+    return result.exit_code()
 
 
 # --- doctor subcommand ---------------------------------------------------
@@ -308,8 +362,8 @@ def _run_doctor_diagnostics(whisper_dir: Path) -> tuple[bool, list[str], dict[st
                 fix_hints.append(
                     "No whisper models are installed. To list, pick, and download one:\n"
                     "    localcaption model list\n"
-                    "    localcaption model download base.en   # ~142 MB; English-only\n"
-                    "    localcaption model download small.en  # ~466 MB; better quality\n"
+                    f"    localcaption model download {DEFAULT_MODEL}  # ~466 MB; English-only default\n"
+                    "    localcaption model download tiny.en   # ~75 MB; faster, lower quality\n"
                     "    (or just run: localcaption doctor --fix)"
                 )
         else:
@@ -335,7 +389,7 @@ def _run_doctor_diagnostics(whisper_dir: Path) -> tuple[bool, list[str], dict[st
             "        ~/.local/share/localcaption/whisper.cpp\n"
             "    cd ~/.local/share/localcaption/whisper.cpp\n"
             "    cmake -B build && cmake --build build -j --config Release\n"
-            "    bash models/download-ggml-model.sh base.en\n\n"
+            f"    bash models/download-ggml-model.sh {DEFAULT_MODEL}\n\n"
             "  Option D — point us at an existing whisper.cpp checkout:\n"
             "    export LOCALCAPTION_WHISPER_DIR=/path/to/your/whisper.cpp\n"
             "    # add that line to your shell rc to make it stick"
@@ -653,6 +707,7 @@ def _cmd_model_rm(argv: list[str]) -> int:
 def _print_top_level_help() -> None:
     print("""\
 usage: localcaption <url-or-file> [options]    transcribe a video (default)
+       localcaption --batch FILE [options]     transcribe a list of URLs/files
        localcaption doctor                     diagnose your install
        localcaption model <subcommand>         list / download / remove models
        localcaption --help                     show transcribe help

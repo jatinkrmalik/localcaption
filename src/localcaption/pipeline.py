@@ -7,6 +7,7 @@ This module is the public Python API. The CLI is a thin wrapper around
 from __future__ import annotations
 
 import shutil
+import wave
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,6 +31,7 @@ class PipelineResult:
     audio_path: Path | None
     wav_path: Path | None
     transcripts: TranscriptionResult
+    duration_s: float | None = None
 
 
 def _is_local_file(source: str) -> bool:
@@ -46,6 +48,7 @@ def transcribe_url(
     model: str = DEFAULT_MODEL,
     language: str = "auto",
     keep_intermediate: bool = False,
+    stem: str | None = None,
     backend: str | Backend = DEFAULT_BACKEND,
 ) -> PipelineResult:
     """Run the full pipeline on *url* and return the produced artefacts.
@@ -67,6 +70,8 @@ def transcribe_url(
         ISO language code or ``"auto"`` to let whisper detect it.
     keep_intermediate:
         If True, leave the downloaded audio + 16 kHz WAV in ``out_dir/.work``.
+    stem:
+        Basename for transcript files. Defaults to the audio/file stem.
     backend:
         Backend name (``whisper-cpp``, ``faster-whisper``) or a :class:`Backend`.
     """
@@ -81,14 +86,16 @@ def transcribe_url(
 
     audio_path: Path | None = None
     wav_path: Path | None = None
+    duration_s: float | None = None
     try:
         audio_path = (
             Path(url).resolve() if _is_local_file(url) else download_audio(url, work_dir)
         )
         wav_path = work_dir / f"{audio_path.stem}.16k.wav"
         to_whisper_wav(audio_path, wav_path)
+        duration_s = _wav_duration_s(wav_path)
 
-        out_base = out_dir / audio_path.stem
+        out_base = out_dir / (stem or audio_path.stem)
         transcripts = transcribe(
             wav_path,
             model,
@@ -109,4 +116,16 @@ def transcribe_url(
         audio_path=audio_path,
         wav_path=wav_path,
         transcripts=transcripts,
+        duration_s=duration_s,
     )
+
+
+def _wav_duration_s(path: Path) -> float | None:
+    try:
+        with wave.open(str(path), "rb") as wf:
+            rate = wf.getframerate()
+            if not rate:
+                return None
+            return wf.getnframes() / float(rate)
+    except Exception:
+        return None

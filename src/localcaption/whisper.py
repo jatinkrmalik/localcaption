@@ -14,7 +14,7 @@ from typing import Protocol
 
 from .errors import DependencyError
 
-DEFAULT_MODEL = "base.en"
+DEFAULT_MODEL = "small.en"
 BACKEND_WHISPER_CPP = "whisper-cpp"
 BACKEND_FASTER_WHISPER = "faster-whisper"
 DEFAULT_BACKEND = BACKEND_WHISPER_CPP
