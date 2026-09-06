@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "localcaption"
-version = "0.4.0"
+version = "0.4.1"
 description = "Local, offline Whisper transcription for YouTube, Vimeo, Twitch, and local video/audio. Writes SRT, VTT, JSON, and text. No API keys. whisper.cpp by default, optional faster-whisper."
 readme = "README.md"
 requires-python = ">=3.10"
