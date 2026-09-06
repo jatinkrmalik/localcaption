@@ -14,6 +14,8 @@ from pathlib import Path
 from . import _logging as log
 from .audio import to_whisper_wav
 from .download import download_audio
+from .summary import DEFAULT_MODEL as DEFAULT_SUMMARY_MODEL
+from .summary import write_summary
 from .whisper import (
     DEFAULT_BACKEND,
     DEFAULT_MODEL,
@@ -32,6 +34,7 @@ class PipelineResult:
     wav_path: Path | None
     transcripts: TranscriptionResult
     duration_s: float | None = None
+    summary: Path | None = None
 
 
 def _is_local_file(source: str) -> bool:
@@ -50,6 +53,9 @@ def transcribe_url(
     keep_intermediate: bool = False,
     stem: str | None = None,
     backend: str | Backend = DEFAULT_BACKEND,
+    summary: bool = False,
+    summary_model: str = DEFAULT_SUMMARY_MODEL,
+    summary_prompt: Path | None = None,
 ) -> PipelineResult:
     """Run the full pipeline on *url* and return the produced artefacts.
 
@@ -74,6 +80,14 @@ def transcribe_url(
         Basename for transcript files. Defaults to the audio/file stem.
     backend:
         Backend name (``whisper-cpp``, ``faster-whisper``) or a :class:`Backend`.
+    summary:
+        If True, POST the ``.txt`` transcript to local Ollama and write
+        ``<id>.summary.md``. Failures are warnings; they do not raise.
+    summary_model:
+        Ollama model name (default ``llama3.1:8b``).
+    summary_prompt:
+        Optional path to a prompt template. ``{transcript}`` is substituted
+        if present; otherwise the transcript is appended.
     """
     # Validate named backends before yt-dlp/ffmpeg.
     if isinstance(backend, str):
@@ -110,6 +124,14 @@ def transcribe_url(
             audio_path = None
             wav_path = None
 
+    summary_path: Path | None = None
+    if summary:
+        summary_path = write_summary(
+            transcripts.txt,
+            model=summary_model,
+            prompt_path=summary_prompt,
+        )
+
     log.info("done")
     return PipelineResult(
         source_url=url,
@@ -117,6 +139,7 @@ def transcribe_url(
         wav_path=wav_path,
         transcripts=transcripts,
         duration_s=duration_s,
+        summary=summary_path,
     )
 
 

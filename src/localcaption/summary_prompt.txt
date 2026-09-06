@@ -1,0 +1,18 @@
+Summarize the transcript below. Reply in Markdown with these sections:
+
+## TL;DR
+Two to four sentences covering the main takeaway.
+
+## Key points
+Bullet list of the most important ideas.
+
+## Notable quotes
+Direct quotes worth keeping. Omit this section if none stand out.
+
+## Action items
+Concrete follow-ups for the listener. Omit this section if none.
+
+Use only what the transcript says. Do not invent facts.
+
+Transcript:
+{transcript}

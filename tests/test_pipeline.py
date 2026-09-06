@@ -247,6 +247,7 @@ class TestTranscribeUrlLocalFile:
 
         assert result.audio_path is None
         assert result.wav_path is None
+        assert result.summary is None
 
     def test_forwards_backend(self, monkeypatch, tmp_path: Path, dummy_faster_whisper) -> None:
         video = tmp_path / "clip.mp4"
@@ -323,3 +324,103 @@ class TestTranscribeUrlLocalFile:
         with pytest.raises(DependencyError, match="requires a whisper.cpp directory"):
             transcribe_url("https://example.com/v", out_dir=tmp_path / "out")
         assert download_called is False
+
+
+class TestTranscribeUrlSummary:
+    def _stub_stages(self, monkeypatch) -> None:
+        def fake_to_whisper_wav(src, dst):
+            dst.write_text("fake wav")
+            return dst
+
+        def fake_transcribe(wav, model, out_base, *, whisper_dir, language, **kwargs):
+            txt = out_base.with_suffix(".txt")
+            txt.parent.mkdir(parents=True, exist_ok=True)
+            txt.write_text("hello from the talk")
+            fake_transcripts = MagicMock()
+            fake_transcripts.txt = txt
+            fake_transcripts.existing.return_value = {"txt": txt}
+            return fake_transcripts
+
+        monkeypatch.setattr("localcaption.pipeline.to_whisper_wav", fake_to_whisper_wav)
+        monkeypatch.setattr("localcaption.pipeline.transcribe", fake_transcribe)
+
+    def test_summary_true_writes_and_returns_path(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        video = tmp_path / "interview.mkv"
+        video.write_text("fake video")
+        out_dir = tmp_path / "out"
+        whisper_dir = tmp_path / "whisper.cpp"
+        self._stub_stages(monkeypatch)
+
+        written: dict[str, object] = {}
+
+        def fake_write_summary(txt, *, model, prompt_path):
+            written["txt"] = txt
+            written["model"] = model
+            written["prompt_path"] = prompt_path
+            out = Path(txt).with_name(f"{Path(txt).stem}.summary.md")
+            out.write_text("sum")
+            return out
+
+        monkeypatch.setattr("localcaption.pipeline.write_summary", fake_write_summary)
+
+        result = transcribe_url(
+            str(video),
+            out_dir=out_dir,
+            whisper_dir=whisper_dir,
+            model="base.en",
+            summary=True,
+            summary_model="mistral",
+            summary_prompt=tmp_path / "prompt.txt",
+        )
+
+        assert result.summary == out_dir / "interview.summary.md"
+        assert written["model"] == "mistral"
+        assert written["prompt_path"] == tmp_path / "prompt.txt"
+        assert Path(written["txt"]).name == "interview.txt"
+
+    def test_summary_off_by_default_does_not_call_writer(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        video = tmp_path / "interview.mkv"
+        video.write_text("fake video")
+        called = {"n": 0}
+
+        def fake_write_summary(*args, **kwargs):
+            called["n"] += 1
+            return None
+
+        self._stub_stages(monkeypatch)
+        monkeypatch.setattr("localcaption.pipeline.write_summary", fake_write_summary)
+
+        result = transcribe_url(
+            str(video),
+            out_dir=tmp_path / "out",
+            whisper_dir=tmp_path / "whisper.cpp",
+            model="base.en",
+        )
+        assert called["n"] == 0
+        assert result.summary is None
+
+    def test_summary_failure_does_not_fail_pipeline(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        video = tmp_path / "interview.mkv"
+        video.write_text("fake video")
+        self._stub_stages(monkeypatch)
+
+        def fake_write_summary(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr("localcaption.pipeline.write_summary", fake_write_summary)
+
+        result = transcribe_url(
+            str(video),
+            out_dir=tmp_path / "out",
+            whisper_dir=tmp_path / "whisper.cpp",
+            model="base.en",
+            summary=True,
+        )
+        assert isinstance(result, PipelineResult)
+        assert result.summary is None

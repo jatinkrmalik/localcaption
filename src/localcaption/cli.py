@@ -22,6 +22,7 @@ from . import _logging as log
 from .batch import read_url_list, transcribe_urls
 from .errors import LocalCaptionError
 from .pipeline import transcribe_url
+from .summary import DEFAULT_MODEL as DEFAULT_SUMMARY_MODEL
 from .whisper import (
     BACKEND_NAMES,
     BACKEND_WHISPER_CPP,
@@ -126,6 +127,18 @@ def _build_transcribe_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--auto-download", action="store_true",
         help="if the requested model isn't installed, download it without asking",
+    )
+    parser.add_argument(
+        "--summary", action="store_true",
+        help="write a Markdown summary via local Ollama (http://localhost:11434)",
+    )
+    parser.add_argument(
+        "--summary-model", default=DEFAULT_SUMMARY_MODEL,
+        help=f"Ollama model for --summary (default: {DEFAULT_SUMMARY_MODEL})",
+    )
+    parser.add_argument(
+        "--summary-prompt", type=Path, default=None,
+        help="path to a prompt template for --summary (default: built-in)",
     )
     parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {__version__}")
     return parser
@@ -237,6 +250,9 @@ def _run_one(args: argparse.Namespace, whisper_dir: Path, backend: str) -> int:
             language=args.language,
             keep_intermediate=args.keep_audio,
             backend=backend,
+            summary=args.summary,
+            summary_model=args.summary_model,
+            summary_prompt=args.summary_prompt,
         )
     except LocalCaptionError as exc:
         log.error(str(exc))
@@ -245,6 +261,8 @@ def _run_one(args: argparse.Namespace, whisper_dir: Path, backend: str) -> int:
     log.info("transcript files:")
     for kind, path in result.transcripts.existing().items():
         print(f"  {kind:>4}: {path}")
+    if result.summary is not None:
+        print(f"  summary: {result.summary}")
 
     if not args.no_print:
         txt = result.transcripts.txt

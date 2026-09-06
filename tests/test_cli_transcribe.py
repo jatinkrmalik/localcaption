@@ -274,3 +274,55 @@ class TestCliBatch:
             ]
         )
         assert rc == 1
+
+
+class TestCliSummaryFlags:
+    def test_help_mentions_summary_flags(self, capsys) -> None:
+        with pytest.raises(SystemExit) as excinfo:
+            main(["--help"])
+        assert excinfo.value.code == 0
+        out = capsys.readouterr().out
+        assert "--summary" in out
+        assert "--summary-model" in out
+        assert "--summary-prompt" in out
+        assert "llama3.1:8b" in out
+
+    def test_summary_flags_forwarded_to_pipeline(self, monkeypatch, tmp_path: Path) -> None:
+        captured: dict = {}
+        prompt = tmp_path / "prompt.txt"
+        prompt.write_text("hi")
+
+        def fake_transcribe_url(url, **kw):
+            captured.update(kw)
+            captured["url"] = url
+            raise SystemExit(0)
+
+        monkeypatch.setattr("localcaption.cli.transcribe_url", fake_transcribe_url)
+        monkeypatch.setattr("localcaption.cli._ensure_model_available", lambda *_a, **_k: True)
+        with pytest.raises(SystemExit):
+            main(
+                [
+                    "https://example.com/v",
+                    "--summary",
+                    "--summary-model",
+                    "mistral",
+                    "--summary-prompt",
+                    str(prompt),
+                ]
+            )
+        assert captured["summary"] is True
+        assert captured["summary_model"] == "mistral"
+        assert captured["summary_prompt"] == prompt
+
+    def test_summary_off_by_default(self, monkeypatch) -> None:
+        captured: dict = {}
+
+        def fake_transcribe_url(url, **kw):
+            captured.update(kw)
+            raise SystemExit(0)
+
+        monkeypatch.setattr("localcaption.cli.transcribe_url", fake_transcribe_url)
+        monkeypatch.setattr("localcaption.cli._ensure_model_available", lambda *_a, **_k: True)
+        with pytest.raises(SystemExit):
+            main(["https://example.com/v"])
+        assert captured["summary"] is False
