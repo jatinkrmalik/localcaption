@@ -168,6 +168,9 @@ localcaption "https://vimeo.com/148751763"
 # Local video/audio files
 localcaption /path/to/video.mp4
 localcaption ./recording.wav
+
+# Batch: one URL or local path per line (# comments and blank lines ignored)
+localcaption --batch urls.txt -o transcripts/ -m small.en
 ```
 
 | flag | default | what it does |
@@ -178,6 +181,7 @@ localcaption ./recording.wav
 | `--whisper-dir` | auto-detect¹ | path to a built whisper.cpp checkout |
 | `--keep-audio` | off | keep the downloaded audio + intermediate WAV in `<out>/.work/` |
 | `--no-print` | off | don't echo the transcript to stdout |
+| `--batch FILE` | off | transcribe each non-empty, non-`#` line in FILE sequentially |
 
 ¹ `--whisper-dir` resolution order:
    1. The explicit flag value, if given.
@@ -186,6 +190,12 @@ localcaption ./recording.wav
    4. `~/.local/share/localcaption/whisper.cpp` (where `install.sh` puts it).
 
 Outputs `<videoId>.txt`, `.srt`, `.vtt`, and `.json` in the chosen directory. For local files, the output filename is derived from the input file's name.
+
+`--batch FILE` writes each item into `<out>/<videoId>/` and skips any video
+whose `.txt` is already there, so you can re-run a list after a failure.
+Local paths are relative to the list file (and `~` is expanded). The process
+is sequential (whisper.cpp already saturates the machine). Exit 0 if
+everything succeeded or was skipped, 1 otherwise.
 
 You can also invoke it as a module: `python -m localcaption <url-or-file>`.
 
@@ -259,6 +269,21 @@ result = transcribe_url(
 print(result.transcripts.txt.read_text())
 ```
 
+Batch from Python:
+
+```python
+from pathlib import Path
+from localcaption.batch import read_url_list, transcribe_urls
+
+result = transcribe_urls(
+    read_url_list(Path("urls.txt")),
+    out_dir=Path("transcripts"),
+    whisper_dir=Path("whisper.cpp"),
+    model="small.en",
+)
+print(result.summary())
+```
+
 ## Architecture
 
 `localcaption` is intentionally tiny: an orchestrator (`pipeline.py`) drives
@@ -273,7 +298,7 @@ for `faster-whisper` without touching `download.py` or `audio.py`.
 | Layer | Files | Responsibility |
 |---|---|---|
 | Entry points | `cli.py`, `__main__.py` | argparse, exit codes, stdout formatting |
-| Orchestration | `pipeline.py` | public Python API: `transcribe_url(...)` |
+| Orchestration | `pipeline.py`, `batch.py` | public Python API: `transcribe_url(...)`, `transcribe_urls(...)` |
 | Pipeline stages | `download.py`, `audio.py`, `whisper.py` | one external tool each |
 | Support | `errors.py`, `_logging.py` | exception hierarchy, tiny logger |
 
