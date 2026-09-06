@@ -1,8 +1,8 @@
 # localcaption
 
-> Paste a video URL, get a transcript. **Fully local, no API keys.**
->
-> Works with YouTube, Vimeo, Twitch, Twitter/X, and [1000+ other sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) via yt-dlp.
+Offline Whisper transcription for YouTube and local files. Writes SRT, VTT, and JSON. No API key.
+
+> Local, offline Whisper transcription for YouTube, Vimeo, Twitch, Twitter/X, and [1000+ other sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) via yt-dlp, plus any video or audio file on disk. Paste a URL or a path; get `.txt`, `.srt`, `.vtt`, and `.json` without an API key and without uploading audio to the cloud. Default engine is [whisper.cpp](https://github.com/ggerganov/whisper.cpp); [faster-whisper](https://github.com/SYSTRAN/faster-whisper) is optional.
 
 <!-- Package: where to get it, what versions, what license -->
 [![PyPI version](https://img.shields.io/pypi/v/localcaption?logo=pypi&logoColor=white&color=%233775A9&cacheSeconds=300)](https://pypi.org/project/localcaption/)
@@ -20,6 +20,10 @@
 [![Open issues](https://img.shields.io/github/issues/jatinkrmalik/localcaption?logo=github)](https://github.com/jatinkrmalik/localcaption/issues)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
+```bash
+pipx install localcaption && localcaption doctor --fix
+```
+
 `localcaption` is a tiny orchestrator over three battle-tested tools:
 
 | Stage | Tool |
@@ -29,9 +33,28 @@
 | Transcribe locally | [`whisper.cpp`](https://github.com/ggerganov/whisper.cpp) (default) or [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) |
 
 Nothing is uploaded to a third-party service. No OpenAI / Google / DeepL keys
-required. Runs happily on a laptop.
+required. Unlike pasting a clip into ChatGPT or calling the Whisper API,
+transcription stays on your laptop after the download.
 
 ![Pipeline overview](docs/diagrams/pipeline.png)
+
+## Why localcaption
+
+- **Offline Whisper.** Audio is transcribed on your machine. No API key, no account.
+- **URLs and local files.** Any URL [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports, plus local `.mp4` / `.wav` / `.mp3` / similar.
+- **Captions you can use.** One run writes `.txt`, `.srt`, `.vtt`, and `.json`.
+- **Batch.** `--batch urls.txt` walks a list of URLs or files.
+- **Chapters.** YouTube chapter markers become `.chapters.json` and `.chaptered.md`.
+- **Search.** `localcaption search <term>` greps past transcripts with timestamps.
+- **Local summaries.** `--summary` talks to a local [Ollama](https://ollama.com), not a hosted LLM.
+- **Two backends.** whisper.cpp by default; `pip install 'localcaption[faster]'` for faster-whisper.
+- **`doctor --fix`.** Installs missing `ffmpeg`/`cmake`, builds whisper.cpp, and downloads the default `small.en` model.
+
+## Who this is for
+
+- Podcasters and video folks who need SRT/VTT without uploading episodes.
+- Researchers transcribing interviews or lectures they cannot send to a cloud API.
+- Anyone who wants a YouTube transcript without logging into Google or pasting audio into ChatGPT.
 
 ## Install
 
@@ -45,14 +68,14 @@ required. Runs happily on a laptop.
 
 The most Pythonic install. [`pipx`](https://pipx.pypa.io) creates an isolated
 virtualenv for `localcaption` and drops the console script on your `$PATH`,
-so you can run `localcaption <url>` from anywhere without polluting your
+so you can run `localcaption <url-or-file>` from anywhere without polluting your
 system Python.
 
 ```bash
 pipx install localcaption
 ```
 
-The first time you run `localcaption <url>` it will tell you it can't find
+The first time you run `localcaption <url-or-file>` it will tell you it can't find
 `whisper.cpp`. The fastest way to set it up is to let `localcaption` do it
 itself: clone, build, and download the default model in one shot:
 
@@ -110,7 +133,7 @@ models cache for next time).
 Sample output:
 
 ```
-localcaption 0.2.0
+localcaption 0.4.0
 
 System tools:
   ✅ python  (3.12.3)
@@ -127,7 +150,7 @@ whisper.cpp:
   ✅ binary built  (.../build/bin/whisper-cli)
   ✅ models present  (ggml-small.en.bin)
 
-All checks passed. You're good to go: localcaption <url>
+All checks passed. You're good to go: localcaption <url-or-file>
 ```
 
 If anything is missing, re-run with `--fix` and `localcaption` will install
@@ -148,7 +171,7 @@ git clone https://github.com/jatinkrmalik/localcaption
 cd localcaption
 ./scripts/setup.sh           # creates .venv, pip install -e .[dev], clones+builds whisper.cpp HERE
 source .venv/bin/activate
-pytest                        # 14 tests, all should pass
+pytest                        # the suite should pass
 ```
 
 The dev setup keeps `whisper.cpp/` inside the repo (so you can poke at it),
@@ -448,17 +471,34 @@ criteria, and discussion):
 | # | Item | Labels |
 |---|---|---|
 | [#7](https://github.com/jatinkrmalik/localcaption/issues/7) | `localcaption model {list,download,rm,info}` subcommand | _shipped in v0.2.0_ ✅ |
-| [#2](https://github.com/jatinkrmalik/localcaption/issues/2) | Batch mode (`--batch urls.txt`) | `enhancement` |
-| [#3](https://github.com/jatinkrmalik/localcaption/issues/3) | Local auto-summary via Ollama (`--summary`) | `enhancement` |
+| [#2](https://github.com/jatinkrmalik/localcaption/issues/2) | Batch mode (`--batch urls.txt`) | _shipped in v0.4.0_ ✅ |
+| [#3](https://github.com/jatinkrmalik/localcaption/issues/3) | Local auto-summary via Ollama (`--summary`) | _shipped in v0.4.0_ ✅ |
 | [#4](https://github.com/jatinkrmalik/localcaption/issues/4) | Speaker diarization with pyannote.audio (`--diarize`) | `stretch`, `help wanted` |
-| [#5](https://github.com/jatinkrmalik/localcaption/issues/5) | YouTube chapters & grep-able search index | `enhancement` |
-| [#6](https://github.com/jatinkrmalik/localcaption/issues/6) | Pluggable transcription backends (faster-whisper / MLX) | `help wanted` |
-| [#1](https://github.com/jatinkrmalik/localcaption/issues/1) | Switch default model from `base.en` to `small.en` | _unreleased_ ✅ |
+| [#5](https://github.com/jatinkrmalik/localcaption/issues/5) | YouTube chapters & grep-able search index | _shipped in v0.4.0_ ✅ |
+| [#6](https://github.com/jatinkrmalik/localcaption/issues/6) | Pluggable transcription backends (faster-whisper / MLX) | _faster-whisper shipped in v0.4.0_ ✅ |
+| [#1](https://github.com/jatinkrmalik/localcaption/issues/1) | Switch default model from `base.en` to `small.en` | _shipped in v0.4.0_ ✅ |
 
 **Have an idea?** Open a
 [feature request](https://github.com/jatinkrmalik/localcaption/issues/new/choose),
 or jump into [Discussions](https://github.com/jatinkrmalik/localcaption/discussions)
 if you want to chat about it first.
+
+## FAQ
+
+**Does it need an OpenAI API key?**
+No. Whisper runs locally via whisper.cpp or faster-whisper.
+
+**Does audio leave my machine?**
+No, except the download of a URL you asked for. Transcription and optional Ollama summaries stay on localhost.
+
+**YouTube only?**
+No. Any site [yt-dlp supports](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) (Vimeo, Twitch, Twitter/X, podcasts, and many more), plus local video and audio files.
+
+**Does it write SRT and VTT?**
+Yes. Each run writes `.txt`, `.srt`, `.vtt`, and `.json`.
+
+**Windows?**
+macOS and Linux are the supported platforms (`doctor --fix` uses Homebrew or apt). Native Windows is not supported. WSL is the realistic path if you are on Windows.
 
 ## Related projects
 
