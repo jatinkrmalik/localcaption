@@ -13,7 +13,14 @@ from pathlib import Path
 from . import _logging as log
 from .audio import to_whisper_wav
 from .download import download_audio
-from .whisper import DEFAULT_BACKEND, DEFAULT_MODEL, Backend, TranscriptionResult, transcribe
+from .whisper import (
+    DEFAULT_BACKEND,
+    DEFAULT_MODEL,
+    Backend,
+    TranscriptionResult,
+    get_backend,
+    transcribe,
+)
 
 
 @dataclass(frozen=True)
@@ -35,7 +42,7 @@ def transcribe_url(
     url: str,
     *,
     out_dir: Path,
-    whisper_dir: Path,
+    whisper_dir: Path | None = None,
     model: str = DEFAULT_MODEL,
     language: str = "auto",
     keep_intermediate: bool = False,
@@ -63,6 +70,10 @@ def transcribe_url(
     backend:
         Backend name (``whisper-cpp``, ``faster-whisper``) or a :class:`Backend`.
     """
+    # Validate named backends before yt-dlp/ffmpeg.
+    if isinstance(backend, str):
+        get_backend(backend, whisper_dir=whisper_dir)
+
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     work_dir = out_dir / ".work"

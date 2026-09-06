@@ -100,14 +100,20 @@ def test_get_backend_unknown() -> None:
         get_backend("mlx", whisper_dir=Path("/tmp"))
 
 
-def test_get_backend_returns_implementations(tmp_path: Path) -> None:
+def test_get_backend_returns_implementations(tmp_path: Path, dummy_faster_whisper) -> None:
     from localcaption.backends.faster_whisper import FasterWhisperBackend
     from localcaption.backends.whisper_cpp import WhisperCppBackend
 
     cpp = get_backend(BACKEND_WHISPER_CPP, whisper_dir=tmp_path)
-    fw = get_backend(BACKEND_FASTER_WHISPER, whisper_dir=tmp_path)
+    fw = get_backend(BACKEND_FASTER_WHISPER)
     assert isinstance(cpp, WhisperCppBackend)
     assert isinstance(fw, FasterWhisperBackend)
+
+
+def test_get_backend_faster_whisper_missing_extra(monkeypatch) -> None:
+    monkeypatch.setitem(sys.modules, "faster_whisper", None)
+    with pytest.raises(DependencyError, match="localcaption\\[faster\\]"):
+        get_backend(BACKEND_FASTER_WHISPER)
 
 
 # --- whisper.cpp ---------------------------------------------------------
@@ -237,6 +243,14 @@ def test_faster_whisper_writes_outputs(monkeypatch, tmp_path: Path) -> None:
     assert payload["language"] == "en"
     assert payload["text"] == "Helloworld"
     assert len(payload["segments"]) == 2
+
+
+def test_transcribe_faster_whisper_without_whisper_dir(monkeypatch, tmp_path: Path) -> None:
+    _install_fake_faster_whisper(monkeypatch)
+    wav = tmp_path / "audio.wav"
+    wav.write_bytes(b"fake")
+    result = transcribe(wav, "base.en", tmp_path / "talk", backend=BACKEND_FASTER_WHISPER)
+    assert result.txt.exists()
 
 
 def test_faster_whisper_passes_language(monkeypatch, tmp_path: Path) -> None:

@@ -10,6 +10,18 @@ from ..errors import DependencyError, TranscriptionError
 from ..whisper import TranscriptionResult
 
 
+def require_faster_whisper() -> type:
+    """Return ``WhisperModel``, or raise if the optional extra is missing."""
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError as exc:
+        raise DependencyError(
+            "faster-whisper is not installed. "
+            "Install it with: pip install 'localcaption[faster]'"
+        ) from exc
+    return WhisperModel
+
+
 class FasterWhisperBackend:
     """Transcribe with SYSTRAN/faster-whisper (CTranslate2).
 
@@ -26,13 +38,7 @@ class FasterWhisperBackend:
         *,
         language: str = "auto",
     ) -> TranscriptionResult:
-        try:
-            from faster_whisper import WhisperModel
-        except ImportError as exc:
-            raise DependencyError(
-                "faster-whisper is not installed. "
-                "Install it with: pip install 'localcaption[faster]'"
-            ) from exc
+        WhisperModel = require_faster_whisper()
 
         lang = None if language == "auto" else language
         log.info(f"faster-whisper: model={model} language={language}")

@@ -275,9 +275,11 @@ result = transcribe_url(
     out_dir=Path("transcripts"),
     whisper_dir=Path("whisper.cpp"),
     model="base.en",
-    backend="whisper-cpp",  # or "faster-whisper"
 )
 print(result.transcripts.txt.read_text())
+
+# faster-whisper (pip install 'localcaption[faster]') does not need whisper_dir:
+# transcribe_url(url, out_dir=Path("transcripts"), backend="faster-whisper")
 ```
 
 ## Architecture

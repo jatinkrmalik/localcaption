@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
+from localcaption.errors import DependencyError
 from localcaption.pipeline import PipelineResult, _is_local_file, transcribe_url
 from localcaption.whisper import BACKEND_FASTER_WHISPER, DEFAULT_BACKEND
 
@@ -215,7 +219,7 @@ class TestTranscribeUrlLocalFile:
         assert result.audio_path is None
         assert result.wav_path is None
 
-    def test_forwards_backend(self, monkeypatch, tmp_path: Path) -> None:
+    def test_forwards_backend(self, monkeypatch, tmp_path: Path, dummy_faster_whisper) -> None:
         video = tmp_path / "clip.mp4"
         video.write_text("fake")
         captured: dict = {}
@@ -236,7 +240,57 @@ class TestTranscribeUrlLocalFile:
         transcribe_url(
             str(video),
             out_dir=tmp_path / "out",
-            whisper_dir=tmp_path / "whisper.cpp",
             backend=BACKEND_FASTER_WHISPER,
         )
         assert captured["backend"] == BACKEND_FASTER_WHISPER
+
+    def test_missing_faster_whisper_extra_skips_download(self, monkeypatch, tmp_path: Path) -> None:
+        monkeypatch.setitem(sys.modules, "faster_whisper", None)
+        download_called = False
+
+        def fake_download(url, work_dir):
+            nonlocal download_called
+            download_called = True
+            return work_dir / "downloaded.m4a"
+
+        monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
+
+        with pytest.raises(DependencyError, match="localcaption\\[faster\\]"):
+            transcribe_url(
+                "https://example.com/v",
+                out_dir=tmp_path / "out",
+                backend=BACKEND_FASTER_WHISPER,
+            )
+        assert download_called is False
+
+    def test_unknown_backend_skips_download(self, monkeypatch, tmp_path: Path) -> None:
+        download_called = False
+
+        def fake_download(url, work_dir):
+            nonlocal download_called
+            download_called = True
+            return work_dir / "downloaded.m4a"
+
+        monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
+
+        with pytest.raises(DependencyError, match="Unknown transcription backend"):
+            transcribe_url(
+                "https://example.com/v",
+                out_dir=tmp_path / "out",
+                backend="mlx",
+            )
+        assert download_called is False
+
+    def test_whisper_cpp_without_dir_skips_download(self, monkeypatch, tmp_path: Path) -> None:
+        download_called = False
+
+        def fake_download(url, work_dir):
+            nonlocal download_called
+            download_called = True
+            return work_dir / "downloaded.m4a"
+
+        monkeypatch.setattr("localcaption.pipeline.download_audio", fake_download)
+
+        with pytest.raises(DependencyError, match="requires a whisper.cpp directory"):
+            transcribe_url("https://example.com/v", out_dir=tmp_path / "out")
+        assert download_called is False

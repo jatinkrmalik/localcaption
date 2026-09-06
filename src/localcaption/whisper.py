@@ -104,8 +104,9 @@ def get_backend(name: str, *, whisper_dir: Path | None = None) -> Backend:
 
         return WhisperCppBackend(whisper_dir)
     if name == BACKEND_FASTER_WHISPER:
-        from .backends.faster_whisper import FasterWhisperBackend
+        from .backends.faster_whisper import FasterWhisperBackend, require_faster_whisper
 
+        require_faster_whisper()
         return FasterWhisperBackend()
     raise DependencyError(
         f"Unknown transcription backend {name!r}. "
@@ -118,7 +119,7 @@ def transcribe(
     model: str,
     out_basename: Path,
     *,
-    whisper_dir: Path,
+    whisper_dir: Path | None = None,
     language: str = "auto",
     backend: str | Backend = DEFAULT_BACKEND,
 ) -> TranscriptionResult:
