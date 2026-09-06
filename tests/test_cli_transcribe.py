@@ -35,6 +35,7 @@ class TestCliLocalFileDispatch:
             raise SystemExit(0)
 
         monkeypatch.setattr("localcaption.cli.transcribe_url", fake_transcribe_url)
+        monkeypatch.setattr("localcaption.cli._ensure_model_available", lambda *_a, **_k: True)
         with pytest.raises(SystemExit):
             main([str(video)])
         assert sentinel["url"] == str(video)
@@ -47,6 +48,7 @@ class TestCliLocalFileDispatch:
             raise SystemExit(0)
 
         monkeypatch.setattr("localcaption.cli.transcribe_url", fake_transcribe_url)
+        monkeypatch.setattr("localcaption.cli._ensure_model_available", lambda *_a, **_k: True)
         with pytest.raises(SystemExit):
             main(["https://www.youtube.com/watch?v=dQw4w9WgXcQ"])
         assert sentinel["url"] == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
@@ -61,6 +63,7 @@ class TestCliLocalFileDispatch:
             raise SystemExit(0)
 
         monkeypatch.setattr("localcaption.cli.transcribe_url", fake_transcribe_url)
+        monkeypatch.setattr("localcaption.cli._ensure_model_available", lambda *_a, **_k: True)
         with pytest.raises(SystemExit):
             main(["./relative.mp4"])
         assert sentinel["url"] == "./relative.mp4"

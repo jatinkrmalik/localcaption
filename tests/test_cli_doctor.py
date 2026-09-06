@@ -84,6 +84,7 @@ def test_unknown_subcommand_treated_as_url(monkeypatch) -> None:
         raise SystemExit(0)
 
     monkeypatch.setattr("localcaption.cli.transcribe_url", fake)
+    monkeypatch.setattr("localcaption.cli._ensure_model_available", lambda *_a, **_k: True)
     with pytest.raises(SystemExit):
         main(["https://example.com/video"])
     assert sentinel["url"] == "https://example.com/video"

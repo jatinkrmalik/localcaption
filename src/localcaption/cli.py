@@ -287,8 +287,8 @@ def _run_doctor_diagnostics(whisper_dir: Path) -> tuple[bool, list[str], dict[st
                 fix_hints.append(
                     "No whisper models are installed. To list, pick, and download one:\n"
                     "    localcaption model list\n"
-                    "    localcaption model download base.en   # ~142 MB; English-only\n"
-                    "    localcaption model download small.en  # ~466 MB; better quality\n"
+                    "    localcaption model download small.en  # ~466 MB; English-only default\n"
+                    "    localcaption model download tiny.en   # ~75 MB; faster, lower quality\n"
                     "    (or just run: localcaption doctor --fix)"
                 )
         else:
@@ -314,7 +314,7 @@ def _run_doctor_diagnostics(whisper_dir: Path) -> tuple[bool, list[str], dict[st
             "        ~/.local/share/localcaption/whisper.cpp\n"
             "    cd ~/.local/share/localcaption/whisper.cpp\n"
             "    cmake -B build && cmake --build build -j --config Release\n"
-            "    bash models/download-ggml-model.sh base.en\n\n"
+            "    bash models/download-ggml-model.sh small.en\n\n"
             "  Option D — point us at an existing whisper.cpp checkout:\n"
             "    export LOCALCAPTION_WHISPER_DIR=/path/to/your/whisper.cpp\n"
             "    # add that line to your shell rc to make it stick"

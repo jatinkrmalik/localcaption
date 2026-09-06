@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from localcaption.errors import DependencyError
-from localcaption.whisper import WhisperPaths
+from localcaption.whisper import DEFAULT_MODEL, WhisperPaths
 
 
 def _touch_executable(path: Path) -> None:
@@ -39,6 +39,10 @@ def test_find_binary_missing_raises(tmp_path: Path) -> None:
     paths = WhisperPaths(tmp_path)
     with pytest.raises(DependencyError):
         paths.find_binary()
+
+
+def test_default_model_is_small_en() -> None:
+    assert DEFAULT_MODEL == "small.en"
 
 
 def test_model_file_path(tmp_path: Path) -> None:
