@@ -1,6 +1,6 @@
 <div align="center">
 
-# localcaption
+# <img src="docs/icons/localcaption.svg" alt="localcaption" width="56" height="56" /> localcaption
 
 Offline Whisper transcription for YouTube and local files. Writes SRT, VTT, and JSON. No API key.
 

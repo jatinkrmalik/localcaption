@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Subtitle tiles">
+  <rect width="512" height="512" fill="#F8FAFC"/>
+  <rect x="48" y="48" width="416" height="416" rx="96" fill="#0D9488"/>
+  <rect x="108" y="148" width="240" height="72" rx="18" fill="#F8FAFC"/>
+  <rect x="148" y="172" width="140" height="14" rx="7" fill="#0F172A"/>
+  <rect x="148" y="196" width="96" height="14" rx="7" fill="#64748B"/>
+  <rect x="164" y="220" width="260" height="72" rx="18" fill="#F8FAFC"/>
+  <rect x="196" y="244" width="160" height="14" rx="7" fill="#0F172A"/>
+  <rect x="196" y="268" width="112" height="14" rx="7" fill="#64748B"/>
+  <rect x="124" y="292" width="220" height="72" rx="18" fill="#0F172A"/>
+  <rect x="156" y="316" width="132" height="14" rx="7" fill="#F8FAFC"/>
+  <rect x="156" y="340" width="88" height="14" rx="7" fill="#94A3B8"/>
+</svg>
