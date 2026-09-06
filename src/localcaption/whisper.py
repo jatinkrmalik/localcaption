@@ -60,6 +60,17 @@ class TranscriptionResult:
         return {k: v for k, v in vars(self).items() if isinstance(v, Path) and v.exists()}
 
 
+def output_file(out_basename: Path, suffix: str) -> Path:
+    """Append ``suffix`` without pathlib stripping extra dots in the stem.
+
+    ``Path.with_suffix('.txt')`` turns ``lecture.2024`` into ``lecture.txt``.
+    whisper.cpp's ``-of`` keeps the full basename, so we must too.
+    """
+    if not suffix.startswith("."):
+        suffix = "." + suffix
+    return out_basename.parent / f"{out_basename.name}{suffix}"
+
+
 def transcribe(
     wav: Path,
     model: str,
@@ -96,8 +107,8 @@ def transcribe(
         ) from exc
 
     return TranscriptionResult(
-        txt=out_basename.with_suffix(".txt"),
-        srt=out_basename.with_suffix(".srt"),
-        vtt=out_basename.with_suffix(".vtt"),
-        json=out_basename.with_suffix(".json"),
+        txt=output_file(out_basename, ".txt"),
+        srt=output_file(out_basename, ".srt"),
+        vtt=output_file(out_basename, ".vtt"),
+        json=output_file(out_basename, ".json"),
     )

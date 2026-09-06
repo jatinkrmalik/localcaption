@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from localcaption.errors import DependencyError
-from localcaption.whisper import DEFAULT_MODEL, WhisperPaths
+from localcaption.whisper import DEFAULT_MODEL, WhisperPaths, output_file
 
 
 def _touch_executable(path: Path) -> None:
@@ -55,3 +55,11 @@ def test_setup_and_install_scripts_default_to_small_en() -> None:
 def test_model_file_path(tmp_path: Path) -> None:
     paths = WhisperPaths(tmp_path)
     assert paths.model_file("base.en") == tmp_path / "models" / "ggml-base.en.bin"
+
+
+def test_output_file_keeps_dotted_stem(tmp_path: Path) -> None:
+    base = tmp_path / "talk.final"
+    assert output_file(base, ".txt") == tmp_path / "talk.final.txt"
+    assert output_file(base, "json") == tmp_path / "talk.final.json"
+    plain = tmp_path / "vid123"
+    assert output_file(plain, ".srt") == tmp_path / "vid123.srt"

@@ -8,6 +8,7 @@ across yt-dlp versions.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -20,15 +21,22 @@ from .errors import DependencyError, DownloadError
 DEFAULT_PLAYER_CLIENTS: tuple[str, ...] = ("android", "ios", "web")
 
 
+@dataclass(frozen=True)
+class DownloadResult:
+    """Downloaded audio plus the yt-dlp info dict (chapters, title, ...)."""
+    path: Path
+    info: dict[str, Any]
+
+
 def download_audio(
     url: str,
     work_dir: Path,
     *,
     player_clients: tuple[str, ...] = DEFAULT_PLAYER_CLIENTS,
-) -> Path:
+) -> DownloadResult:
     """Download the best audio stream for *url* into *work_dir*.
 
-    Returns the path to the downloaded file. Raises :class:`DownloadError`
+    Returns the path plus the yt-dlp info dict. Raises :class:`DownloadError`
     if yt-dlp fails to produce a usable file.
     """
     try:
@@ -76,4 +84,4 @@ def download_audio(
         )
 
     log.info(f"downloaded audio: {audio_path.name}")
-    return audio_path
+    return DownloadResult(path=audio_path, info=info or {})
