@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .. import _logging as log
 from ..errors import DependencyError, TranscriptionError
-from ..whisper import TranscriptionResult, WhisperPaths
+from ..whisper import TranscriptionResult, WhisperPaths, output_file
 
 
 class WhisperCppBackend:
@@ -51,8 +51,8 @@ class WhisperCppBackend:
             ) from exc
 
         return TranscriptionResult(
-            txt=out_basename.with_suffix(".txt"),
-            srt=out_basename.with_suffix(".srt"),
-            vtt=out_basename.with_suffix(".vtt"),
-            json=out_basename.with_suffix(".json"),
+            txt=output_file(out_basename, ".txt"),
+            srt=output_file(out_basename, ".srt"),
+            vtt=output_file(out_basename, ".vtt"),
+            json=output_file(out_basename, ".json"),
         )

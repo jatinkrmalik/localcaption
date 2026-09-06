@@ -2,11 +2,12 @@
 
 Exposed as the ``localcaption`` console script via ``pyproject.toml``.
 
-Two invocation styles are supported:
+Invocation styles:
 
     localcaption <url-or-file> [options]   # one-shot transcription (default)
     localcaption --batch FILE [options]    # sequential list of URLs/files
     localcaption doctor                    # diagnose your install
+    localcaption search <term>             # grep past transcripts
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ from .whisper import (
 
 # Subcommands recognised by the dispatcher. Anything else is treated as a URL
 # and routed to the implicit "transcribe" command for backwards compatibility.
-SUBCOMMANDS = frozenset({"doctor", "transcribe"})
+SUBCOMMANDS = frozenset({"doctor", "transcribe", "search"})
 
 
 # --- whisper.cpp directory resolution ------------------------------------
@@ -263,6 +264,10 @@ def _run_one(args: argparse.Namespace, whisper_dir: Path, backend: str) -> int:
         print(f"  {kind:>4}: {path}")
     if result.summary is not None:
         print(f"  summary: {result.summary}")
+    if result.chapters_json:
+        print(f"  chapters: {result.chapters_json}")
+    if result.chaptered_md:
+        print(f"  chaptered: {result.chaptered_md}")
 
     if not args.no_print:
         txt = result.transcripts.txt
@@ -722,12 +727,48 @@ def _cmd_model_rm(argv: list[str]) -> int:
     return 0
 
 
+def _cmd_search(argv: list[str]) -> int:
+    """Grep previously transcribed videos via the JSONL search index."""
+    parser = argparse.ArgumentParser(
+        prog="localcaption search",
+        description="Search past transcripts. Ranked by hit count; "
+                    "timestamps come from whisper JSON/SRT when present.",
+    )
+    parser.add_argument(
+        "term",
+        nargs="+",
+        help="search term (case-insensitive substring)",
+    )
+    args = parser.parse_args(argv)
+
+    from .chapters import format_timestamp
+    from .index import default_index_path, search_index
+
+    term = " ".join(args.term)
+    try:
+        hits = search_index(term)
+    except OSError as exc:
+        log.error(f"could not read search index: {exc}")
+        return 1
+    if not hits:
+        print(f"No matches for {term!r} in {default_index_path()}")
+        return 1
+
+    for hit in hits:
+        ts = format_timestamp(hit.start) if hit.start is not None else "--:--"
+        print(f"{hit.id}  {ts}  {hit.text}")
+        if hit.title:
+            print(f"        {hit.title}")
+    return 0
+
+
 def _print_top_level_help() -> None:
     print("""\
 usage: localcaption <url-or-file> [options]    transcribe a video (default)
        localcaption --batch FILE [options]     transcribe a list of URLs/files
        localcaption doctor                     diagnose your install
        localcaption model <subcommand>         list / download / remove models
+       localcaption search <term>              search past transcripts
        localcaption --help                     show transcribe help
        localcaption --version                  print version
 
@@ -754,6 +795,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_doctor(argv[1:])
     if head == "model":
         return _cmd_model(argv[1:])
+    if head == "search":
+        return _cmd_search(argv[1:])
     if head == "transcribe":
         return _cmd_transcribe(argv[1:])
 

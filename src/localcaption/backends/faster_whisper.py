@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .. import _logging as log
 from ..errors import DependencyError, TranscriptionError
-from ..whisper import TranscriptionResult
+from ..whisper import TranscriptionResult, output_file
 
 
 def require_faster_whisper() -> type:
@@ -55,10 +55,10 @@ class FasterWhisperBackend:
         out_basename.parent.mkdir(parents=True, exist_ok=True)
 
         full_text = "".join(getattr(s, "text", "") or "" for s in segments).strip()
-        txt_path = out_basename.with_suffix(".txt")
-        srt_path = out_basename.with_suffix(".srt")
-        vtt_path = out_basename.with_suffix(".vtt")
-        json_path = out_basename.with_suffix(".json")
+        txt_path = output_file(out_basename, ".txt")
+        srt_path = output_file(out_basename, ".srt")
+        vtt_path = output_file(out_basename, ".vtt")
+        json_path = output_file(out_basename, ".json")
 
         txt_path.write_text(full_text + ("\n" if full_text else ""), encoding="utf-8")
         srt_path.write_text(_to_srt(segments), encoding="utf-8")

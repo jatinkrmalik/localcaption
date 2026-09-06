@@ -125,10 +125,11 @@ def test_whisper_cpp_writes_outputs(tmp_path: Path) -> None:
     root = _fake_whisper_checkout(tmp_path / "whisper.cpp")
     wav = tmp_path / "audio.wav"
     wav.write_bytes(b"fake")
-    out = tmp_path / "out" / "talk"
+    out = tmp_path / "out" / "talk.final"
 
     result = WhisperCppBackend(root).transcribe(wav, "base.en", out, language="en")
 
+    assert result.txt == tmp_path / "out" / "talk.final.txt"
     assert result.txt.read_text() == "ok"
     assert result.srt.exists()
     assert result.vtt.exists()
@@ -225,9 +226,10 @@ def test_faster_whisper_writes_outputs(monkeypatch, tmp_path: Path) -> None:
     captured = _install_fake_faster_whisper(monkeypatch, segments=segs)
     wav = tmp_path / "audio.wav"
     wav.write_bytes(b"fake")
-    out = tmp_path / "out" / "talk"
+    out = tmp_path / "out" / "talk.final"
 
     result = FasterWhisperBackend().transcribe(wav, "base.en", out, language="auto")
+    assert result.txt == tmp_path / "out" / "talk.final.txt"
 
     assert captured["model"] == "base.en"
     assert captured["audio"] == str(wav)

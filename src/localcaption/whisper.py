@@ -75,6 +75,17 @@ class Backend(Protocol):
     ) -> TranscriptionResult: ...
 
 
+def output_file(out_basename: Path, suffix: str) -> Path:
+    """Append ``suffix`` without pathlib stripping extra dots in the stem.
+
+    ``Path.with_suffix('.txt')`` turns ``lecture.2024`` into ``lecture.txt``.
+    whisper.cpp's ``-of`` keeps the full basename, so we must too.
+    """
+    if not suffix.startswith("."):
+        suffix = "." + suffix
+    return out_basename.parent / f"{out_basename.name}{suffix}"
+
+
 def resolve_backend_name(cli_value: str | None = None) -> str:
     """Return the backend name from an explicit value, env, or the default.
 

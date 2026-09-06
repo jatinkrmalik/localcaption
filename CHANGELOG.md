@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (TL;DR, key points, notable quotes, action items). If Ollama is down,
   times out, or returns a bad response, the pipeline still succeeds and
   prints a warning. `HTTP_PROXY` is ignored for this call.
+- **YouTube chapters.** When yt-dlp reports chapter markers, write
+  `<id>.chapters.json` and a `<id>.chaptered.md` with headings like
+  `## 00:00 Intro`. The raw whisper `<id>.txt` is unchanged.
+- **`localcaption search <term>`.** Grep previously transcribed videos via a
+  JSONL index at `~/.local/share/localcaption/index.jsonl` (override with
+  `LOCALCAPTION_INDEX_PATH`). Matches are ranked by hit count and printed
+  with timestamps when whisper JSON/SRT is available.
 
 ### Changed
 - Default whisper model is now `small.en` instead of `base.en`. Better
